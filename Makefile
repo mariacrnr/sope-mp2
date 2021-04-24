@@ -1,19 +1,16 @@
-CC = gcc
-CFLAGS =  -Wall -Wextra 
+all: s c
 
-SDIR   = ./src
-OUTDIR  = ./out
+s: server.o lib.o delay.c delay.h
+	gcc -Wall -DDELAY=0 -o s delay.c lib.o server.o -pthread
 
-EXEC =xmod
+c: client.c common.h
+	gcc -Wall -o c client.c -pthread
 
-all : $(EXEC)
+# server.o: server.c common.h
+# 	gcc -Wall -c -o server.o server.c
 
-$(EXEC):  $(OUTDIR)/xmod.o $(OUTDIR)/xmod_aux.o
-	$(CC) $(CFLAGS) $(OUTDIR)/xmod.o $(OUTDIR)/xmod_aux.o -o xmod
+# lib.o: lib.c lib.h
+# 	gcc -Wall -c -o lib.o lib.c
 
-$(OUTDIR)/%.o: $(SDIR)/%.c
-	@mkdir -p $(@D)
-	$(CC) $(CFLAGS) -c $^ -o $@
-
-clean :
-	rm -f $(OUTDIR)/xmod.o $(OUTDIR)/xmod_aux.o xmod
+clean:
+	rm -f s c
