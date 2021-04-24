@@ -10,4 +10,5 @@ typedef struct {
 	int tskload;	// task load
 	int tskres;		// task result
 } Message;
+
 #endif // _COMMON_H
