@@ -25,15 +25,18 @@ typedef struct {
     int requestId;
     int fifoID;
     int privateFifoID;
-    char * privateFifoName;
+    char* privateFifoName;
 } routineArgs;
 
 int cancel = 0;
-int ThreadsFinished = 0;
+//int ThreadsFinished = 0;
+int nprivateFDS = 0;
 
 pthread_mutex_t clientMutex, threadCounterMutex, threadCancelMutex;
 
-int main(int argc, char *argv[]);
+int* privateFDS;
+
+int main(int argc, char* argv[]);
 
 int clientTaskManager(char* fifoname, int time);
 

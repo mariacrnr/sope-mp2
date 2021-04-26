@@ -21,7 +21,7 @@ void cleanupHandler(void *arg) {
 void* routine(void* arg) {
     int privateFD, ret;
 
-    routineArgs *params = arg;
+    routineArgs* params = arg;
     Message message;
     
     srand(time(NULL));   // Initialization, should only be called once.
@@ -37,7 +37,7 @@ void* routine(void* arg) {
     
     snprintf(privateFifo, MAX_BUF, "/tmp/%d.%lu", message.pid, message.tid);
 
-    if (mkfifo(privateFifo, O_WRONLY) == -1) {
+    if (mkfifo(privateFifo, 0666) == -1) {
         perror("Error creating privateFifo\n");
         pthread_exit(NULL);
     }
@@ -58,12 +58,25 @@ void* routine(void* arg) {
         pthread_exit(NULL);
     }
 
+    pthread_mutex_lock(&threadCounterMutex);
+
+    nprivateFDS++;
+    
+    memcpy(&privateFDS[nprivateFDS], &privateFD, sizeof(int));
+
+    pthread_mutex_unlock(&threadCounterMutex);
+
+
     
     params->privateFifoID = privateFD;
     params->privateFifoName = privateFifo;
 
-    pthread_cleanup_push(cleanupHandler, (void *) params); // limpa e dá free a cenas
-    pthread_cleanup_pop(0);
+    
+
+    // pthread_cleanup_push(cleanupHandler, (void *) params); // limpa e dá free a cenas
+    // pthread_cleanup_pop(0);
+
+    //while(ret == 0)
 
     if ((ret = read(privateFD, &message, sizeof(message))) == -1) { // deve ficar aqui parado à espera de resposta do Service;
         printf("Failed to read FIFO\n");
@@ -82,12 +95,16 @@ void* routine(void* arg) {
         }
     }
 
+        //coidog usado no metodo pthread_cancel (subtituido pelo metodo do "file discriptor mass closing")
+    // pthread_mutex_lock(&threadCounterMutex);
 
-    pthread_mutex_lock(&threadCounterMutex);
+    // ThreadsFinished++;
 
-    ThreadsFinished++;
+    // pthread_mutex_unlock(&threadCounterMutex);
 
-    pthread_mutex_unlock(&threadCounterMutex);
+    // close(params->privateFifoID);
+    // remove(params->privateFifoName);
+    free(params);
 
     // reads the response and closes the private fifo
     pthread_exit(NULL);
@@ -101,11 +118,11 @@ int clientTaskManager(char* fifoname, int t){
         return 1;
     }
 
-    struct timespec sleepTime;
-    sleepTime.tv_sec = SLEEP_TIME;     
-
-    int nthreads = 0;
+    // struct timespec sleepTime;
+    // sleepTime.tv_sec = SLEEP_TIME;
+    
     pthread_t* threads;
+    int nthreads = 0;
 
     time_t initT = time(NULL);
     time_t nowT;
@@ -113,12 +130,14 @@ int clientTaskManager(char* fifoname, int t){
 
     while ( (time(&nowT) - initT < t)  && (cancel == 0)) { // e o fecho do server
         nthreads++;
+        nprivateFDS++;
 
         if (nthreads == 1) {
             threads = (pthread_t*) malloc(sizeof(pthread_t));
-        }
-        else{
+            privateFDS = (int *) malloc(sizeof(int));
+        } else{
             threads = (pthread_t*) realloc(threads, sizeof(pthread_t) * nthreads);
+            privateFDS = (int *) realloc(privateFDS, sizeof(int) * nprivateFDS);
         }
 
         routineArgs* args = malloc(sizeof(*args));
@@ -131,18 +150,23 @@ int clientTaskManager(char* fifoname, int t){
             break;
         }
 
-        nanosleep(&sleepTime, NULL);
-    }
 
-    close(fd);
+        sleep(1);
+        //nanosleep(&sleepTime, NULL);
+    }
     
-    for(int c = ThreadsFinished ; c < nthreads; c++){
-        
-        pthread_cancel(threads[c]);
-        
+    for(int c = 0; c < nprivateFDS; c++){
+        close(privateFDS[c]);
+        remove(privateFDS[c]);
     }
+    
+    // for(int c = ThreadsFinished ; c < nthreads; c++){
+        
+    //     pthread_cancel(threads[c]);
+        
+    // }
 
-    for (int i = 0; i < ThreadsFinished; i++) {
+    for (int i = 0; i < nthreads; i++) {
         void *res;
         pthread_join(threads[i], &res);	// Note: threads give no termination code
         printf("%i\n", *((int*)res));
@@ -150,7 +174,8 @@ int clientTaskManager(char* fifoname, int t){
     }
 
     free(threads);
-    
+    free(privateFDS);
+    close(fd);
 
     return 0;
 }
