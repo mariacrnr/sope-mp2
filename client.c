@@ -2,7 +2,7 @@
 
 
 void registOperation(Message message, char* oper) {
-    printf("%ld ; %d ; %d ; %d ; %lu ; %d ; %s\n",
+    printf("%ld ; %d ; %d ; %d ; %ld ; %d ; %s\n",
             time(NULL), message.rid, message.tskload, message.pid, message.tid, message.tskres, oper);
 }
 
@@ -30,7 +30,7 @@ void* routine(void* arg) {
     message.rid = params->requestId;
     message.tskload = r;
     message.pid = getpid();
-    message.tid = gettid();
+    message.tid = pthread_self();
     message.tskres = -1;
     
     char* privateFifo = malloc(MAX_BUF);
@@ -114,20 +114,22 @@ int clientTaskManager(char* fifoname, int t){
     while ( (time(&nowT) - initT < t)  && (cancel == 0)) { // e o fecho do server
         nthreads++;
 
-        threads = (pthread_t*) realloc(threads, sizeof(pthread_t) * nthreads);
+        if (nthreads == 1) {
+            threads = (pthread_t*) malloc(sizeof(pthread_t));
+        }
+        else{
+            threads = (pthread_t*) realloc(threads, sizeof(pthread_t) * nthreads);
+        }
 
         routineArgs* args = malloc(sizeof(*args));
         
         args->requestId = nthreads;
         args->fifoID = fd;
-        //args->
         
-        if (pthread_create(&threads[nthreads], NULL, routine, args) != 0) {
+        if (pthread_create(&threads[nthreads-1], NULL, routine, args) != 0) {
             perror("Error creating new thread");
             break;
         }
-
-        //usleep(delay*1000);
 
         nanosleep(&sleepTime, NULL);
     }
@@ -146,7 +148,6 @@ int clientTaskManager(char* fifoname, int t){
         printf("%i\n", *((int*)res));
         printf("\nTermination of thread %d: %lu.\n", i, (unsigned long)threads[i]);
     }
-
 
     free(threads);
     
