@@ -169,7 +169,7 @@ int clientTaskManager(char* fifoname, int t){
     }
 
     for (int i = 0; i < nthreads; i++) {
-        void *res;
+        void* res;
         pthread_join(threads[i], &res);	// Note: threads give no termination code
         printf("%i\n", *((int*)res));
         printf("\nTermination of thread %d: %lu.\n", i, (unsigned long)threads[i]);
