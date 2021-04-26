@@ -58,15 +58,17 @@ void* routine(void* arg) {
         pthread_exit(NULL);
     }
 
-    pthread_mutex_lock(&threadCounterMutex);
 
-    nprivateFDS++;
+
+    // pthread_mutex_lock(&threadCounterMutex);
+
+    // nprivateFDS++;
     
-    memcpy(&privateFDS[nprivateFDS], &privateFD, sizeof(int));
+    // memcpy(&privateFDS[nprivateFDS], &privateFD, sizeof(int));
 
     pthread_mutex_unlock(&threadCounterMutex);
 
-
+    
     
     params->privateFifoID = privateFD;
     params->privateFifoName = privateFifo;
@@ -76,24 +78,30 @@ void* routine(void* arg) {
     // pthread_cleanup_push(cleanupHandler, (void *) params); // limpa e dá free a cenas
     // pthread_cleanup_pop(0);
 
-    //while(ret == 0)
-
-    if ((ret = read(privateFD, &message, sizeof(message))) == -1) { // deve ficar aqui parado à espera de resposta do Service;
-        printf("Failed to read FIFO\n");
-        pthread_exit(arg); //nao conseguiu fazer o read
-    }
-    else {
-        if (message.tskres == -1) {
-            registOperation(message, "CLOSD"); //mal detetar um CLOSD, parar a produção de threads!!!!
-
-            pthread_mutex_lock(&threadCancelMutex);
-            cancel = 1;
-            pthread_mutex_unlock(&threadCancelMutex);
-                
-        } else {
-            registOperation(message, "GOTRS");
+    if ((ret = read(privateFD, &message, sizeof(message))) == -1) {
+        pthread_mutex_lock(&TimedOutMutex);
+        if (timedOut == 1) {
+            registOperation(message, "GAVUP");
+            remove(params->privateFifoName);
+            free(params);
+            pthread_exit(NULL);
         }
+        pthread_mutex_unlock(&TimedOutMutex);
+        printf("Error on Read\n");
+        pthread_exit(NULL);
     }
+
+    if (message.tskres == -1) {
+        registOperation(message, "CLOSD"); //mal detetar um CLOSD, parar a produção de threads!!!!
+
+        pthread_mutex_lock(&threadCancelMutex);
+        cancel = 1;
+        pthread_mutex_unlock(&threadCancelMutex);
+            
+    } else {
+        registOperation(message, "GOTRS");
+    }
+    
 
         //coidog usado no metodo pthread_cancel (subtituido pelo metodo do "file discriptor mass closing")
     // pthread_mutex_lock(&threadCounterMutex);
@@ -102,8 +110,8 @@ void* routine(void* arg) {
 
     // pthread_mutex_unlock(&threadCounterMutex);
 
-    // close(params->privateFifoID);
-    // remove(params->privateFifoName);
+    close(params->privateFifoID);
+    remove(params->privateFifoName);
     free(params);
 
     // reads the response and closes the private fifo
@@ -130,14 +138,14 @@ int clientTaskManager(char* fifoname, int t){
 
     while ( (time(&nowT) - initT < t)  && (cancel == 0)) { // e o fecho do server
         nthreads++;
-        nprivateFDS++;
+        //nprivateFDS++;
 
         if (nthreads == 1) {
             threads = (pthread_t*) malloc(sizeof(pthread_t));
-            privateFDS = (int *) malloc(sizeof(int));
+            //privateFDS = (int *) malloc(sizeof(int));
         } else{
             threads = (pthread_t*) realloc(threads, sizeof(pthread_t) * nthreads);
-            privateFDS = (int *) realloc(privateFDS, sizeof(int) * nprivateFDS);
+            //privateFDS = (int *) realloc(privateFDS, sizeof(int) * nprivateFDS);
         }
 
         routineArgs* args = malloc(sizeof(*args));
@@ -151,20 +159,14 @@ int clientTaskManager(char* fifoname, int t){
         }
 
 
-        sleep(1);
         //nanosleep(&sleepTime, NULL);
+        sleep(1);
     }
     
-    for(int c = 0; c < nprivateFDS; c++){
-        close(privateFDS[c]);
-        remove(privateFDS[c]);
+    timedOut = 1;
+    for(int c = 3; c < nthreads; c++){
+        close(c);
     }
-    
-    // for(int c = ThreadsFinished ; c < nthreads; c++){
-        
-    //     pthread_cancel(threads[c]);
-        
-    // }
 
     for (int i = 0; i < nthreads; i++) {
         void *res;
@@ -174,7 +176,7 @@ int clientTaskManager(char* fifoname, int t){
     }
 
     free(threads);
-    free(privateFDS);
+    //free(privateFDS);
     close(fd);
 
     return 0;
@@ -185,6 +187,7 @@ int main(int argc, char *argv[]) {
     pthread_mutex_init(&clientMutex, NULL);
     pthread_mutex_init(&threadCounterMutex, NULL);
     pthread_mutex_init(&threadCancelMutex, NULL);
+    pthread_mutex_init(&TimedOutMutex, NULL);
 
     if (argc !=  4) {
         perror("Error at number of arguments\n");
@@ -199,6 +202,7 @@ int main(int argc, char *argv[]) {
     pthread_mutex_destroy(&clientMutex);
     pthread_mutex_destroy(&threadCounterMutex);
     pthread_mutex_destroy(&threadCancelMutex);
+    pthread_mutex_destroy(&TimedOutMutex);
 
     return 0;
 }

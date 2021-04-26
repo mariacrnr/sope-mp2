@@ -15,8 +15,6 @@
 #include <time.h>
 #include <sys/syscall.h>
 
-#define gettid() syscall(SYS_gettid)
-
 #include "macros.h"
 #include "common.h"
 #include "delay.h"
@@ -29,12 +27,14 @@ typedef struct {
 } routineArgs;
 
 int cancel = 0;
+int timedOut = 0;
+
 //int ThreadsFinished = 0;
-int nprivateFDS = 0;
+//int nprivateFDS = 0;
 
-pthread_mutex_t clientMutex, threadCounterMutex, threadCancelMutex;
+pthread_mutex_t clientMutex, threadCounterMutex, threadCancelMutex, TimedOutMutex;
 
-int* privateFDS;
+//int* privateFDS;
 
 int main(int argc, char* argv[]);
 
@@ -42,4 +42,4 @@ int clientTaskManager(char* fifoname, int time);
 
 void registOperation(Message message, char* oper);
 
-#endif // _CLIENT_H
+#endif // _CLIENT_H    
