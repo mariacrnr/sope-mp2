@@ -13,6 +13,7 @@
 #include <signal.h>
 #include <errno.h>
 #include <time.h>
+#include <pthread.h>
 #include <sys/syscall.h>
 
 #include "macros.h"
