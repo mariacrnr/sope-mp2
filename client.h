@@ -32,7 +32,7 @@ pthread_mutex_t clientMutex, threadCancelMutex, TimedOutMutex;
 
 int main(int argc, char* argv[]);
 
-int clientTaskManager(int publicFifoID, int time);
+int clientTaskManager(int publicFifoFD, int time);
 
 void registOperation(Message message, char* oper);
 

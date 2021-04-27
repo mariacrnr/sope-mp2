@@ -1,6 +1,5 @@
 #include "client.h"
 
-
 void registOperation(Message message, char* oper) {
     printf("%ld ; %d ; %d ; %d ; %ld ; %d ; %s\n",
             time(NULL), message.rid, message.tskload, message.pid, message.tid, message.tskres, oper);
@@ -19,7 +18,7 @@ void registOperation(Message message, char* oper) {
 
 
 void* routine(void* arg) {
-    int privateFD, ret, retval;
+    int privateFD, ret;
 
     routineArgs* params = arg;
     Message message;
@@ -67,41 +66,20 @@ void* routine(void* arg) {
         pthread_exit(NULL);
     }
 
-    fd_set rfds;
-    struct timeval tv;
- 
-    FD_ZERO(&rfds);
-    FD_SET(privateFD, &rfds);
-
-    tv.tv_sec = 0;
-    tv.tv_usec = 5000000;
+    ret = read(privateFD, &message, sizeof(message));
+    printf("PRINT READ %d\n", ret);
+    printf("------------ PrivateFD: %d\n", privateFD);
     
-    if( (retval = select(1, &rfds, NULL, NULL, &tv)) == -1){
-        printf("Select failed\n");
-        close(privateFD);
-        remove(privateFifo);
-        free(privateFifo);
-        free(params);
-        pthread_exit(NULL);
-    }
-
-    if (retval != 0) {
-        if ((ret = read(privateFD, &message, sizeof(message))) == -1) {
-            close(privateFD);
-            remove(privateFifo);
-            free(privateFifo);
-            free(params);
-            printf("Read failed\n");
-            pthread_exit(NULL);
-        }
-    } else {
+    if (ret == -1) {
         close(privateFD);
         remove(privateFifo);
         free(privateFifo);
         free(params);
         pthread_mutex_lock(&TimedOutMutex);
-        if (timedOut == 1) registOperation(message, "GAVUP");
-        else printf("Took too long\n");
+        if (timedOut == 1) 
+            registOperation(message, "GAVUP");
+        else 
+            printf("Error in read\n");
         pthread_mutex_unlock(&TimedOutMutex);
         pthread_exit(NULL);
     }
@@ -116,14 +94,6 @@ void* routine(void* arg) {
     } else {
         registOperation(message, "GOTRS");
     }
-    
-
-        //coidog usado no metodo pthread_cancel (subtituido pelo metodo do "file discriptor mass closing")
-    // pthread_mutex_lock(&threadCounterMutex);
-
-    // ThreadsFinished++;
-
-    // pthread_mutex_unlock(&threadCounterMutex);
 
     close(privateFD);
     remove(privateFifo);
@@ -134,11 +104,11 @@ void* routine(void* arg) {
     pthread_exit(NULL);
 }
 
-int clientTaskManager(int publicFifoID, int t){
+int clientTaskManager(int publicFifoFD, int t){
 
     struct timespec sleepTime;
     sleepTime.tv_sec = 0;
-    sleepTime.tv_nsec = 10000000;
+    sleepTime.tv_nsec = 1000000;
     
     pthread_t* threads;
     int nthreads = 0;
@@ -147,7 +117,7 @@ int clientTaskManager(int publicFifoID, int t){
     time_t nowT;
 
 
-    while ( (time(&nowT) - initT < t)  && (cancel == 0)) { // e o fecho do server
+    while ( (time(&nowT) - initT < t)  && (cancel == 0)) { 
         nthreads++;
 
         if (nthreads == 1) {
@@ -160,7 +130,7 @@ int clientTaskManager(int publicFifoID, int t){
         routineArgs* args = malloc(sizeof(*args));
         
         args->requestId = nthreads;
-        args->fifoID = publicFifoID;
+        args->fifoID = publicFifoFD;
         
         if (pthread_create(&threads[nthreads-1], NULL, routine, args) != 0) {
             perror("Error creating new thread");
@@ -168,25 +138,26 @@ int clientTaskManager(int publicFifoID, int t){
         }
 
         nanosleep(&sleepTime, NULL);
-
         //sleep(1);
     }
+
+    close(publicFifoFD);
     
-    if(cancel != 0){
-        timedOut = 1;
-        for(int c = 3; c < nthreads; c++)
+    if (cancel == 0) { 
+        printf("-------------Entrou no Cancel---------------\n"); 
+        timedOut = 1; 
+
+        for(int c = nthreads + 4; c > 2; c--)   
             close(c);
     }
     
-
     for (int i = 0; i < nthreads; i++) {
         if (pthread_join(threads[i], NULL) != 0){
             return 1;
-        }	// Note: threads give no termination code
+        }
     }
 
     free(threads);
-    close(publicFifoID);
 
     return 0;
 }
@@ -194,7 +165,6 @@ int clientTaskManager(int publicFifoID, int t){
 int main(int argc, char *argv[]) {
     int publicFifoID;
 
-    //pthread_mutex_init(&clientMutex, NULL);
     pthread_mutex_init(&threadCancelMutex, NULL);
     pthread_mutex_init(&TimedOutMutex, NULL);
 
@@ -210,11 +180,10 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    //pthread_mutex_destroy(&clientMutex);
     pthread_mutex_destroy(&threadCancelMutex);
     pthread_mutex_destroy(&TimedOutMutex);
 
-    printf("ALOOOOOO\n");
+    printf("FIM\n");
 
     return 0;
 }
