@@ -45,7 +45,7 @@ void* routine(void* arg) {
     }
     
     
-    //pthread_mutex_lock(&clientMutex);
+    pthread_mutex_lock(&clientMutex);
 
     if (write(params->fifoID, &message, sizeof(message)) == -1) { 
         remove(privateFifo);
@@ -54,7 +54,7 @@ void* routine(void* arg) {
 		pthread_exit(NULL);
 	}
 
-    //pthread_mutex_unlock(&clientMutex);
+    pthread_mutex_unlock(&clientMutex);
 
     registOperation(message, "IWANT");
 
@@ -65,12 +65,14 @@ void* routine(void* arg) {
         free(params);
         pthread_exit(NULL);
     }
+    printf("------------ PrivateFD Writer: %d\n", privateFD);
 
     ret = read(privateFD, &message, sizeof(message));
     printf("PRINT READ %d\n", ret);
-    printf("------------ PrivateFD: %d\n", privateFD);
+    printf("------------ PrivateFD Receiver: %d\n", privateFD);
     
-    if (ret == -1) {
+    if (ret == 0) {
+        printf("===========Read failed!\n");
         close(privateFD);
         remove(privateFifo);
         free(privateFifo);
@@ -83,6 +85,7 @@ void* routine(void* arg) {
         pthread_mutex_unlock(&TimedOutMutex);
         pthread_exit(NULL);
     }
+
 
     if (message.tskres == -1) {
         registOperation(message, "CLOSD"); //mal detetar um CLOSD, parar a produção de threads!!!!
@@ -101,6 +104,7 @@ void* routine(void* arg) {
     free(params);
 
     // reads the response and closes the private fifo
+    printf("------------------------%li DIED---------------------\n", pthread_self());
     pthread_exit(NULL);
 }
 
@@ -108,7 +112,7 @@ int clientTaskManager(int publicFifoFD, int t){
 
     struct timespec sleepTime;
     sleepTime.tv_sec = 0;
-    sleepTime.tv_nsec = 1000000;
+    sleepTime.tv_nsec = 3000000;
     
     pthread_t* threads;
     int nthreads = 0;
@@ -146,9 +150,11 @@ int clientTaskManager(int publicFifoFD, int t){
     if (cancel == 0) { 
         printf("-------------Entrou no Cancel---------------\n"); 
         timedOut = 1; 
-
-        for(int c = nthreads + 4; c > 2; c--)   
-            close(c);
+        printf("zzzzzzzzzzzzzzzz nThreads: %d zzzzzzzzzzzzzz\n", nthreads);
+        for (int c = 0; c <= nthreads/2; c++) {
+            close(c + 3);
+            printf("Closed: %d\n", c+3);
+        }  
     }
     
     for (int i = 0; i < nthreads; i++) {
@@ -167,6 +173,7 @@ int main(int argc, char *argv[]) {
 
     pthread_mutex_init(&threadCancelMutex, NULL);
     pthread_mutex_init(&TimedOutMutex, NULL);
+    pthread_mutex_init(&clientMutex, NULL);
 
     if (argc !=  4) {
         perror("Error at number of arguments\n");
@@ -182,6 +189,7 @@ int main(int argc, char *argv[]) {
 
     pthread_mutex_destroy(&threadCancelMutex);
     pthread_mutex_destroy(&TimedOutMutex);
+    pthread_mutex_destroy(&clientMutex);
 
     printf("FIM\n");
 
