@@ -6,16 +6,16 @@ void registOperation(Message message, char* oper) {
             time(NULL), message.rid, message.tskload, message.pid, message.tid, message.tskres, oper);
 }
 
-void cleanupHandler(void *arg) {
+// void cleanupHandler(void *arg) {
 
-    routineArgs *params = arg;
+//     routineArgs *params = arg;
 
-    close(params->privateFifoID);
-    remove(params->privateFifoName);
-    free(params);
+//     close(params->privateFifoID);
+//     remove(params->privateFifoName);
+//     free(params);
 
-    printf("In the cleanup handler\n");
-}
+//     printf("In the cleanup handler\n");
+// }
 
 
 void* routine(void* arg) {
@@ -39,55 +39,44 @@ void* routine(void* arg) {
 
     if (mkfifo(privateFifo, 0666) == -1) {
         perror("Error creating privateFifo\n");
+        remove(privateFifo);
+        free(privateFifo);
+        free(params);
         pthread_exit(NULL);
     }
     
     
-    pthread_mutex_lock(&clientMutex);
+    //pthread_mutex_lock(&clientMutex);
 
     if (write(params->fifoID, &message, sizeof(message)) == -1) { 
+        remove(privateFifo);
+        free(privateFifo);
+        free(params);
 		pthread_exit(NULL);
 	}
 
-    pthread_mutex_unlock(&clientMutex);
+    //pthread_mutex_unlock(&clientMutex);
 
     registOperation(message, "IWANT");
 
 
     if ((privateFD = open(privateFifo, O_RDONLY)) == -1) {
+        remove(privateFifo);
+        free(privateFifo);
+        free(params);
         pthread_exit(NULL);
     }
 
 
-
-    // pthread_mutex_lock(&threadCounterMutex);
-
-    // nprivateFDS++;
-    
-    // memcpy(&privateFDS[nprivateFDS], &privateFD, sizeof(int));
-
-    pthread_mutex_unlock(&threadCounterMutex);
-
-    
-    
-    params->privateFifoID = privateFD;
-    params->privateFifoName = privateFifo;
-
-    
-
-    // pthread_cleanup_push(cleanupHandler, (void *) params); // limpa e dá free a cenas
-    // pthread_cleanup_pop(0);
-
     if ((ret = read(privateFD, &message, sizeof(message))) == -1) {
+        close(privateFD);
+        remove(privateFifo);
+        free(privateFifo);
+        free(params);
         pthread_mutex_lock(&TimedOutMutex);
-        if (timedOut == 1) {
-            registOperation(message, "GAVUP");
-            remove(params->privateFifoName);
-            free(params);
-            pthread_exit(NULL);
-        }
+        if (timedOut == 1) registOperation(message, "GAVUP");
+        else printf("Error on Read\n");
         pthread_mutex_unlock(&TimedOutMutex);
-        printf("Error on Read\n");
         pthread_exit(NULL);
     }
 
@@ -110,8 +99,9 @@ void* routine(void* arg) {
 
     // pthread_mutex_unlock(&threadCounterMutex);
 
-    close(params->privateFifoID);
-    remove(params->privateFifoName);
+    close(privateFD);
+    remove(privateFifo);
+    free(privateFifo);
     free(params);
 
     // reads the response and closes the private fifo
@@ -119,15 +109,16 @@ void* routine(void* arg) {
 }
 
 int clientTaskManager(char* fifoname, int t){
-
+    // Fazer while para abrir o fifo publico criado pelo server. 
     int fd;
     if ((fd = open(fifoname, O_WRONLY)) == -1) {
         perror("Error opening fifo");
         return 1;
     }
 
-    // struct timespec sleepTime;
-    // sleepTime.tv_sec = SLEEP_TIME;
+    struct timespec sleepTime;
+    sleepTime.tv_sec = 0;
+    sleepTime.tv_nsec = 10000000;
     
     pthread_t* threads;
     int nthreads = 0;
@@ -138,14 +129,12 @@ int clientTaskManager(char* fifoname, int t){
 
     while ( (time(&nowT) - initT < t)  && (cancel == 0)) { // e o fecho do server
         nthreads++;
-        //nprivateFDS++;
 
         if (nthreads == 1) {
             threads = (pthread_t*) malloc(sizeof(pthread_t));
-            //privateFDS = (int *) malloc(sizeof(int));
+            
         } else{
             threads = (pthread_t*) realloc(threads, sizeof(pthread_t) * nthreads);
-            //privateFDS = (int *) realloc(privateFDS, sizeof(int) * nprivateFDS);
         }
 
         routineArgs* args = malloc(sizeof(*args));
@@ -155,12 +144,12 @@ int clientTaskManager(char* fifoname, int t){
         
         if (pthread_create(&threads[nthreads-1], NULL, routine, args) != 0) {
             perror("Error creating new thread");
-            break;
+            return 1;
         }
 
+        nanosleep(&sleepTime, NULL);
 
-        //nanosleep(&sleepTime, NULL);
-        sleep(1);
+        //sleep(1);
     }
     
     timedOut = 1;
@@ -169,14 +158,12 @@ int clientTaskManager(char* fifoname, int t){
     }
 
     for (int i = 0; i < nthreads; i++) {
-        void* res;
-        pthread_join(threads[i], &res);	// Note: threads give no termination code
-        printf("%i\n", *((int*)res));
-        printf("\nTermination of thread %d: %lu.\n", i, (unsigned long)threads[i]);
+        if (pthread_join(threads[i], NULL) != 0){
+            return 1;
+        }	// Note: threads give no termination code
     }
 
     free(threads);
-    //free(privateFDS);
     close(fd);
 
     return 0;
@@ -184,8 +171,7 @@ int clientTaskManager(char* fifoname, int t){
 
 int main(int argc, char *argv[]) {
 
-    pthread_mutex_init(&clientMutex, NULL);
-    pthread_mutex_init(&threadCounterMutex, NULL);
+    //pthread_mutex_init(&clientMutex, NULL);
     pthread_mutex_init(&threadCancelMutex, NULL);
     pthread_mutex_init(&TimedOutMutex, NULL);
 
@@ -199,10 +185,11 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    pthread_mutex_destroy(&clientMutex);
-    pthread_mutex_destroy(&threadCounterMutex);
+    //pthread_mutex_destroy(&clientMutex);
     pthread_mutex_destroy(&threadCancelMutex);
     pthread_mutex_destroy(&TimedOutMutex);
+
+    printf("ALOOOOOO\n");
 
     return 0;
 }

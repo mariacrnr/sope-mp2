@@ -22,19 +22,13 @@
 typedef struct {
     int requestId;
     int fifoID;
-    int privateFifoID;
-    char* privateFifoName;
 } routineArgs;
 
 int cancel = 0;
 int timedOut = 0;
 
-//int ThreadsFinished = 0;
-//int nprivateFDS = 0;
+pthread_mutex_t clientMutex, threadCancelMutex, TimedOutMutex;
 
-pthread_mutex_t clientMutex, threadCounterMutex, threadCancelMutex, TimedOutMutex;
-
-//int* privateFDS;
 
 int main(int argc, char* argv[]);
 
