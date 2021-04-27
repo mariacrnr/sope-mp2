@@ -19,7 +19,7 @@ void registOperation(Message message, char* oper) {
 
 
 void* routine(void* arg) {
-    int privateFD, ret;
+    int privateFD, ret, retval;
 
     routineArgs* params = arg;
     Message message;
@@ -67,15 +67,41 @@ void* routine(void* arg) {
         pthread_exit(NULL);
     }
 
+    fd_set rfds;
+    struct timeval tv;
+ 
+    FD_ZERO(&rfds);
+    FD_SET(privateFD, &rfds);
 
-    if ((ret = read(privateFD, &message, sizeof(message))) == -1) {
+    tv.tv_sec = 0;
+    tv.tv_usec = 5000000;
+    
+    if( (retval = select(1, &rfds, NULL, NULL, &tv)) == -1){
+        printf("Select failed\n");
+        close(privateFD);
+        remove(privateFifo);
+        free(privateFifo);
+        free(params);
+        pthread_exit(NULL);
+    }
+
+    if (retval != 0) {
+        if ((ret = read(privateFD, &message, sizeof(message))) == -1) {
+            close(privateFD);
+            remove(privateFifo);
+            free(privateFifo);
+            free(params);
+            printf("Read failed\n");
+            pthread_exit(NULL);
+        }
+    } else {
         close(privateFD);
         remove(privateFifo);
         free(privateFifo);
         free(params);
         pthread_mutex_lock(&TimedOutMutex);
         if (timedOut == 1) registOperation(message, "GAVUP");
-        else printf("Error on Read\n");
+        else printf("Took too long\n");
         pthread_mutex_unlock(&TimedOutMutex);
         pthread_exit(NULL);
     }
@@ -108,13 +134,7 @@ void* routine(void* arg) {
     pthread_exit(NULL);
 }
 
-int clientTaskManager(char* fifoname, int t){
-    // Fazer while para abrir o fifo publico criado pelo server. 
-    int fd;
-    if ((fd = open(fifoname, O_WRONLY)) == -1) {
-        perror("Error opening fifo");
-        return 1;
-    }
+int clientTaskManager(int publicFifoID, int t){
 
     struct timespec sleepTime;
     sleepTime.tv_sec = 0;
@@ -140,7 +160,7 @@ int clientTaskManager(char* fifoname, int t){
         routineArgs* args = malloc(sizeof(*args));
         
         args->requestId = nthreads;
-        args->fifoID = fd;
+        args->fifoID = publicFifoID;
         
         if (pthread_create(&threads[nthreads-1], NULL, routine, args) != 0) {
             perror("Error creating new thread");
@@ -152,10 +172,12 @@ int clientTaskManager(char* fifoname, int t){
         //sleep(1);
     }
     
-    timedOut = 1;
-    for(int c = 3; c < nthreads; c++){
-        close(c);
+    if(cancel != 0){
+        timedOut = 1;
+        for(int c = 3; c < nthreads; c++)
+            close(c);
     }
+    
 
     for (int i = 0; i < nthreads; i++) {
         if (pthread_join(threads[i], NULL) != 0){
@@ -164,12 +186,13 @@ int clientTaskManager(char* fifoname, int t){
     }
 
     free(threads);
-    close(fd);
+    close(publicFifoID);
 
     return 0;
 }
 
 int main(int argc, char *argv[]) {
+    int publicFifoID;
 
     //pthread_mutex_init(&clientMutex, NULL);
     pthread_mutex_init(&threadCancelMutex, NULL);
@@ -179,8 +202,10 @@ int main(int argc, char *argv[]) {
         perror("Error at number of arguments\n");
         return 1;
     }
+    
+    while((publicFifoID = open(argv[3], O_WRONLY)) == -1);
 
-    if (clientTaskManager(argv[3], atoi(argv[2])) == 1) {
+    if (clientTaskManager(publicFifoID, atoi(argv[2])) == 1) {
         perror("Error at clientTaskManager\n");
         return 1;
     }
