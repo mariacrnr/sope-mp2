@@ -51,7 +51,7 @@ void* routine(void* arg) {
         remove(privateFifo);
         free(privateFifo);
         free(params);
-		pthread_exit(NULL);
+		pthread_exit(NULL); 
 	}
 
     pthread_mutex_unlock(&clientMutex);
@@ -60,6 +60,7 @@ void* routine(void* arg) {
 
 
     if ((privateFD = open(privateFifo, O_RDONLY)) == -1) {
+        printf("O open morreu-se");
         remove(privateFifo);
         free(privateFifo);
         free(params);
