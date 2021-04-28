@@ -5,18 +5,6 @@ void registOperation(Message message, char* oper) {
             time(NULL), message.rid, message.tskload, message.pid, message.tid, message.tskres, oper);
 }
 
-// void cleanupHandler(void *arg) {
-
-//     routineArgs *params = arg;
-
-//     close(params->privateFifoID);
-//     remove(params->privateFifoName);
-//     free(params);
-
-//     printf("In the cleanup handler\n");
-// }
-
-
 void* routine(void* arg) {
     int privateFD, ret;
 
@@ -108,9 +96,12 @@ int clientTaskManager(int publicFifoFD, int t){
     struct timespec sleepTime;
     sleepTime.tv_sec = 0;
     sleepTime.tv_nsec = 3000000;
-    
-    pthread_t* threads;
+
+    pthread_t thread;
     int nthreads = 0;
+
+    pthreadLinked* start = NULL;
+    pthreadLinked* current = NULL;
 
     time_t initT = time(NULL);
     time_t nowT;
@@ -118,44 +109,40 @@ int clientTaskManager(int publicFifoFD, int t){
     while ( (time(&nowT) - initT < t)  && (cancel == 0)) { 
         nthreads++;
 
-        if (nthreads == 1) {
-            threads = (pthread_t*) malloc(sizeof(pthread_t));
-            
-        } else{
-            threads = (pthread_t*) realloc(threads, sizeof(pthread_t) * nthreads);
-        }
-
         routineArgs* args = malloc(sizeof(*args));
         
         args->requestId = nthreads;
         args->fifoID = publicFifoFD;
-        
-        if (pthread_create(&threads[nthreads-1], NULL, routine, args) != 0) {
+
+        if (pthread_create(&thread, NULL, routine, args) != 0) {
             perror("Error creating new thread");
             return 1;
         }
+
+        if (nthreads == 1) startLinkedList(thread, start);
+        else insertThread(thread, current);
+        
         
         nanosleep(&sleepTime, NULL);
-
-        //sleep(1);
     }
     
     if (cancel == 0) { 
-        //printf("-------------Entrou no Cancel---------------\n"); 
+
         timedOut = 1; 
-        //printf("zzzzzzzzzzzzzzzz nThreads: %d zzzzzzzzzzzzzz\n", nthreads);
-        for (int c = 0; c <= nthreads/2; c++) {
+
+        for (int c = 0; c <= nthreads; c++) {
             close(c + 3);
-            //printf("Closed: %d\n", c+3);
         }  
     }
-
-    for (int i = 0; i < nthreads; i++) {
-        if(pthread_join(threads[i], NULL) != 0) return 1;
+    
+    current = start;
+    while (current != NULL) {
+        if (pthread_join(current->thread, NULL) != 0) return 1;
+        current = current->next;
     }
 
     close(publicFifoFD);
-    free(threads);
+    freeLinkedList(start);
 
     return 0;
 }
