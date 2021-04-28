@@ -1,27 +1,25 @@
 #include "linkedList.h"
 
-void startLinkedList(pthread_t thread, pthreadLinked* start) {
-
-    start = (pthreadLinked*) malloc(sizeof(pthreadLinked));
-    start->thread = thread;
-
+void startLinkedList(pthread_t thread, pthreadLinked** start) {
+    *start = (pthreadLinked*) malloc(sizeof(pthreadLinked));
+    (*start)->thread = thread;
+    (*start)->next = NULL;
 }
 
 
-void insertThread(pthread_t thread, pthreadLinked* current) {
-    
+void insertThread (pthread_t thread, pthreadLinked** current) {
     pthreadLinked* newThread = (pthreadLinked*) malloc(sizeof(pthreadLinked));
     newThread->thread = thread;
-    current->next = newThread;
-    current = newThread;
-
+    newThread->next = NULL;
+    (*current)->next = newThread;
+    (*current) = newThread;
 }
 
 
-void freeLinkedList(pthreadLinked* start) {
-    while (start != NULL) {
-        pthreadLinked* tempLink = start;
-        start = start->next;
+void freeLinkedList(pthreadLinked** start) {
+    while (*start != NULL) {
+        pthreadLinked* tempLink = *start;
+        *start = (*start)->next;
         free(tempLink);
     }
 }
