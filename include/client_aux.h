@@ -1,3 +1,6 @@
+#ifndef INCLUDE_CLIENT_AUX_H_
+#define INCLUDE_CLIENT_AUX_H_ 1
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
@@ -8,21 +11,22 @@
 #include <time.h>
 #include <pthread.h>
 
-#include "common.h"
+#include "../include/common.h"
 
 typedef struct {
     int requestId;
     int fifoID;
+    unsigned int seed;
 } routineArgs;
 
 /**
  * @brief Function that prints the operations executed by the program
  * 
  * @param message information associated with the operation.
- * @param oper Operation that ocured. 
+ * @param oper operation that occurred. 
  * 
  */
-void registOperation(Message message, char* oper);
+void registOperation(Message message, const char* oper);
 
 /**
  * @brief Function that handles all the functions that remove or free objects
@@ -40,5 +44,6 @@ void cleanup (char* privateFifo, routineArgs* params);
  * @param requestID ID of the client request. 
  * 
  */
-void parseMessage(Message* message, int requestID );
+void parseMessage(Message* message, int requestID, unsigned int seed);
 
+#endif // INCLUDE_CLIENT_AUX_H_ 

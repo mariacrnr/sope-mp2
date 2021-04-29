@@ -1,3 +1,6 @@
+#ifndef INCLUDE_LINKEDLIST_H_
+#define INCLUDE_LINKEDLIST_H_ 1
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
@@ -35,3 +38,5 @@ void insertThread(pthread_t thread, pthreadLinked** current);
  * 
  */
 void freeLinkedList(pthreadLinked**  start);
+
+#endif // INCLUDE_LINKEDLIST_H_

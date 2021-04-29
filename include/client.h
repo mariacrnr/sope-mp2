@@ -1,10 +1,10 @@
-#ifndef _CLIENT_H
-#define _CLIENT_H 1
+#ifndef INCLUDE_CLIENT_H_
+#define INCLUDE_CLIENT_H_ 1
 
-#include "macros.h"
-#include "client_aux.h"
-#include "delay.h"
-#include "linkedList.h"
+#include "../include/macros.h"
+#include "../include/client_aux.h"
+#include "../include/delay.h"
+#include "../include/linkedList.h"
 
 //Global variable that turns to 1 if the Server times out
 int cancel = 0;
@@ -30,7 +30,7 @@ pthread_mutex_t TimedOutMutex;
 int main(int argc, char* argv[]);
 
 /**
- * @brief Function of the Client program that creates new threads, that resemble Client requests, until the Server or the Clients times out; 
+ * @brief Function of the Client's program that creates new threads, that resemble Client requests, until the Server or the Clients times out; 
  * 
  * @param publicFifoFD File Descriptor of the public FIFO
  * @param t time in seconds until client shuts down
@@ -40,4 +40,4 @@ int main(int argc, char* argv[]);
 int clientTaskManager(int publicFifoFD, int t);
 
 
-#endif // _CLIENT_H    
+#endif  // INCLUDE_CLIENT_H_

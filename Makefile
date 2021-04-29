@@ -1,16 +1,22 @@
-all: s c
+CC = gcc
+CFLAGS =  -Wall -Wextra 
 
-s: server.o lib.o delay.c delay.h
-	gcc -Wall -DDELAY=100 -o s delay.c lib.o server.o -pthread
+PTHREAD = -pthread
 
-c: client.c client.h common.h linkedList.c linkedList.h client_aux.c client_aux.h
-	gcc -Wall -o c client.c linkedList.c client_aux.c -pthread
+SDIR   = ./src
+OUTDIR  = ./out
+IDIR = ./include
 
-# server.o: server.c common.h
-# 	gcc -Wall -c -o server.o server.c
-#
-# lib.o: lib.c lib.h
-# 	gcc -Wall -c -o lib.o lib.c
+SERVER =s
+CLIENT =c
 
-clean:
-	rm -f s c
+all : $(SERVER) $(CLIENT)
+
+$(SERVER):  $(OUTDIR)/server.o $(OUTDIR)/lib.o $(SDIR)/delay.c $(IDIR)/delay.h
+	$(CC) $(CFLAGS) -DDELAY=100 $(SDIR)/delay.c $(OUTDIR)/lib.o $(OUTDIR)/server.o -o s $(PTHREAD)
+
+$(CLIENT):  $(IDIR)/common.h $(SDIR)/*.c
+	$(CC) $(CFLAGS) $(SDIR)/*.c -o c $(PTHREAD)
+
+clean :
+	rm -f $(SERVER) $(CLIENT)
