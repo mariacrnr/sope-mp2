@@ -49,7 +49,9 @@ void* routine(void* arg) {
         cancel = 1;
         pthread_mutex_unlock(&threadCancelMutex);
         
-    } else registOperation(message, "GOTRS");
+    } else {
+        registOperation(message, "GOTRS");
+    }
 
     close(privateFD);
     cleanup(privateFifo,params);
