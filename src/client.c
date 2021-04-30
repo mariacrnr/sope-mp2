@@ -18,7 +18,7 @@ void* routine(void* arg) {
         pthread_exit(NULL);
     }
 
-    if (write(params->fifoID, &message, sizeof(message)) == -1) { 
+    if (write(params->fifoID, &message, sizeof(message)) == -1) { // Sends the Client request to the public FIFO;
         perror("Error writing message to FIFO"); 
         cleanup(privateFifo,params);  
         pthread_exit(NULL);
@@ -26,15 +26,15 @@ void* routine(void* arg) {
 
     registOperation(message, "IWANT");
 
-    if ((privateFD = open(privateFifo, O_RDONLY | O_NONBLOCK, 0666)) < 0) {
+    if ((privateFD = open(privateFifo, O_RDONLY | O_NONBLOCK, 0666)) < 0) { 
         perror("Erro opening private file descriptor");
         cleanup(privateFifo,params);
         pthread_exit(NULL);
     }
 
 
-    while ((ret = read(privateFD, &message, sizeof(message))) != sizeof(message)) { // Loops until reading successfully from private file descriptor or if time out occurs
-        if (timedOut == 1) {
+    while ((ret = read(privateFD, &message, sizeof(message))) != sizeof(message)) { // Loops until a succesful read from the private FIFO
+        if (timedOut == 1) { // If timeOut is 1, then it means that the Client has timed out and all the threads waiting for a response have to give up and terminate
             registOperation(message, "GAVUP");
             close(privateFD);
             cleanup(privateFifo,params);
@@ -42,7 +42,7 @@ void* routine(void* arg) {
         }
     }
 
-    if (message.tskres == -1) { // If server timed out and, consequently, sent to the thread a -1 task result
+    if (message.tskres == -1) { // If the Server timed out, consequently, a -1 task result is sent to the thread
         registOperation(message, "CLOSD");
 
         pthread_mutex_lock(&threadCancelMutex);

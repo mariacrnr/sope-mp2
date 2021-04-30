@@ -19,12 +19,16 @@ pthread_mutex_t threadCancelMutex;
 pthread_mutex_t TimedOutMutex;
 
 /**
- * FALTA COMENTAR !!!!!!!!!!!!!!!!!!
+ * @brief Function that is called every time a thread is created and where a request to the Server is made and sent
+ * 
+ * @param arg A void pointer pointing to a routineArgs variable containing information to be used in the function
+ *
+ * @return A NULL void pointer since the return value of the threads is not meaningful
  */
 void* routine(void* arg);
 
 /**
- * @brief Function of the Client's program that creates new threads, that resemble Client requests, until the Server or the Clients times out; 
+ * @brief Function of the Client's program that creates new threads, that resemble Client requests, until the Server or the Client times out; 
  * 
  * @param publicFifoFD File Descriptor of the public FIFO
  * @param t time in seconds until client shuts down

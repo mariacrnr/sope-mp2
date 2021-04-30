@@ -13,10 +13,11 @@
 
 #include "../include/common.h"
 
+//Struct that stores information to be parsed in the routine function each time a thread is created
 typedef struct {
-    int requestId;
-    int fifoID;
-    unsigned int seed;
+    int requestId; //specific ID of the request
+    int fifoID; //File Descriptor of the public FIFO
+    unsigned int seed; //Random seed to be used in the generation of a random number for the request
 } routineArgs;
 
 /**

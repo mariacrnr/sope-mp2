@@ -20,7 +20,7 @@ void insertThread (pthread_t thread, pthreadLinked** current) {
         newThread->thread = thread;
         newThread->next = NULL;
         (*current)->next = newThread;
-        (*current) = newThread;
+        (*current) = newThread; 
     }
     
 }
