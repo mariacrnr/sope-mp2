@@ -4,7 +4,7 @@ void startLinkedList(pthread_t thread, pthreadLinked** start) {
 
     *start = (pthreadLinked*) malloc(sizeof(pthreadLinked));
 
-    if((*start) != NULL){
+    if ((*start) != NULL) {
         (*start)->thread = thread;
         (*start)->next = NULL;
     }
@@ -16,7 +16,7 @@ void insertThread (pthread_t thread, pthreadLinked** current) {
 
     pthreadLinked* newThread = (pthreadLinked*) malloc(sizeof(pthreadLinked));
 
-    if(newThread != NULL){
+    if (newThread != NULL) {
         newThread->thread = thread;
         newThread->next = NULL;
         (*current)->next = newThread;

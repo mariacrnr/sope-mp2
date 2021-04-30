@@ -33,8 +33,8 @@ void* routine(void* arg) {
     }
 
 
-    while ((ret = read(privateFD, &message, sizeof(message))) != sizeof(message)) {
-        if(timedOut == 1) {
+    while ((ret = read(privateFD, &message, sizeof(message))) != sizeof(message)) { // Loops until reading successfully from private file descriptor or if time out occurs
+        if (timedOut == 1) {
             registOperation(message, "GAVUP");
             close(privateFD);
             cleanup(privateFifo,params);
@@ -42,14 +42,14 @@ void* routine(void* arg) {
         }
     }
 
-    if (message.tskres == -1) {
-        registOperation(message, "CLOSD"); // Ao detetar um CLOSD, parar a produção de threads
+    if (message.tskres == -1) { // If server timed out and, consequently, sent to the thread a -1 task result
+        registOperation(message, "CLOSD");
 
         pthread_mutex_lock(&threadCancelMutex);
-        cancel = 1;
+        cancel = 1; // Stops thread creation loop
         pthread_mutex_unlock(&threadCancelMutex);
         
-    } else {
+    } else { // If no problem occurred
         registOperation(message, "GOTRS");
     }
 
@@ -108,7 +108,7 @@ int clientTaskManager(int publicFifoFD, int t){
     current = start; // Starting at the first thread
     
     while (current != NULL) { // Until the thread pointed to by the last thread is null
-        if (pthread_join(current->thread, NULL) != 0) {
+        if (pthread_join(current->thread, NULL) != 0) { // Join thread
             perror("Error joining threads");
             return 1;
         }
@@ -133,7 +133,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     
-    while((publicFifoID = open(argv[3], O_WRONLY)) == -1); // Waits for public FIFO to be opened by the server
+    while((publicFifoID = open(argv[3], O_WRONLY)) == -1); // Waits until public FIFO is opened by the server
 
     if (clientTaskManager(publicFifoID, atoi(argv[2])) == 1) { // Calls clientTaskManager and handles errors
         perror("Error at clientTaskManager");

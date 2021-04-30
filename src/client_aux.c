@@ -15,7 +15,7 @@ void cleanup (char* privateFifo,routineArgs* params){
 void parseMessage(Message* message, int requestID, unsigned int seed) {
     message->rid = requestID;
     message->pid = getpid();
-    message->tskload = rand_r(&seed) % 9 + 1;
+    message->tskload = rand_r(&seed) % 9 + 1; // Random number between 1 and 9
     message->tid = pthread_self();
     message->tskres = -1;
 }
