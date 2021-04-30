@@ -26,31 +26,30 @@ void* routine(void* arg) {
 
     registOperation(message, "IWANT");
 
-
-    if ((privateFD = open(privateFifo, O_RDONLY)) == -1) {
+    if ((privateFD = open(privateFifo, O_RDONLY | O_NONBLOCK, 0666)) < 0) {
         perror("Erro opening private file descriptor");
         cleanup(privateFifo,params);
         pthread_exit(NULL);
     }
-    ret = read(privateFD, &message, sizeof(message));
-    printf("============= ret: %d ===============\n", ret);
-    if (ret != sizeof(message)) {
-        printf("========== Got In ===========\n");
-        if (timedOut == 1) 
-            registOperation(message, "GAVUP");
-        else 
-            perror("Error in read");
 
-    } else if (message.tskres == -1) {
+
+    while ((ret = read(privateFD, &message, sizeof(message))) != sizeof(message)) {
+        if(timedOut == 1) {
+            registOperation(message, "GAVUP");
+            close(privateFD);
+            cleanup(privateFifo,params);
+            pthread_exit(NULL);
+        }
+    }
+
+    if (message.tskres == -1) {
         registOperation(message, "CLOSD"); // Ao detetar um CLOSD, parar a produção de threads
 
         pthread_mutex_lock(&threadCancelMutex);
         cancel = 1;
         pthread_mutex_unlock(&threadCancelMutex);
         
-    } else {
-        registOperation(message, "GOTRS");
-    }
+    } else registOperation(message, "GOTRS");
 
     close(privateFD);
     cleanup(privateFifo,params);
@@ -61,7 +60,7 @@ int clientTaskManager(int publicFifoFD, int t){
 
     struct timespec sleepTime;      // Struct used to store time durations
     sleepTime.tv_sec = 0;           
-    sleepTime.tv_nsec = 3000000;    
+    sleepTime.tv_nsec = 30000000;    
 
     int nthreads = 0; // Thread counter
 
@@ -86,7 +85,7 @@ int clientTaskManager(int publicFifoFD, int t){
         args->seed = seed + nthreads;
 
         if (pthread_create(&thread, NULL, routine, args) != 0) {  
-            perror("Error creating new thread, errn");
+            perror("Error creating new thread");
             return 1;
         }
 
@@ -99,12 +98,10 @@ int clientTaskManager(int publicFifoFD, int t){
 
         nanosleep(&sleepTime, NULL); // Pauses thread's creation loop for sleepTime time
     }
+
+    if (cancel == 0) // If the Server didn't time out, then it means it was the Client who timed out
+        timedOut = 1; // Client's timeout flag is activated 
     
-    if (cancel == 0) { // If the Server didn't time out, then it means it was the Client who timed out
-        timedOut = 1;  // Client's timeout flag is activated
-        for (int c = 0; c <= nthreads; c++) // Closes all remaining FIFOs
-            close(c + 3); 
-    }
     
     current = start; // Starting at the first thread
     
