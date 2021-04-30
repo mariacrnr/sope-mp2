@@ -62,7 +62,7 @@ int clientTaskManager(int publicFifoFD, int t){
 
     struct timespec sleepTime;      // Struct used to store time durations
     sleepTime.tv_sec = 0;           
-    sleepTime.tv_nsec = 30000000;    
+    sleepTime.tv_nsec = SLEEP_TIME;    
 
     int nthreads = 0; // Thread counter
 

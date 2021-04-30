@@ -29,7 +29,7 @@ typedef struct {
 void registOperation(Message message, const char* oper);
 
 /**
- * @brief Function that handles all the functions that remove or free objects
+ * @brief Function that handles all the functions that remove or free objects in the routine function
  * 
  * @param privateFifo char * that holds the name of the private fifo
  * @param params struct thats stores each thread's arguments

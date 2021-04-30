@@ -18,16 +18,10 @@ pthread_mutex_t threadCancelMutex;
 //Mutex that manages the access to the TimedOut variable
 pthread_mutex_t TimedOutMutex;
 
-
 /**
- * @brief Main function of the Client program that parses the command line arguments and opens the public FIFO and invokes ClientTaskManager;
- * 
- * @param argc Number of command line arguments. 
- * @param argv Array of strings with the command line arguments.
- *
- * @return Returns 0 if no errors occurred, 1 otherwise.
+ * FALTA COMENTAR !!!!!!!!!!!!!!!!!!
  */
-int main(int argc, char* argv[]);
+void* routine(void* arg);
 
 /**
  * @brief Function of the Client's program that creates new threads, that resemble Client requests, until the Server or the Clients times out; 
@@ -39,5 +33,13 @@ int main(int argc, char* argv[]);
  */
 int clientTaskManager(int publicFifoFD, int t);
 
-
+/**
+ * @brief Main function of the Client program that parses the command line arguments and opens the public FIFO and invokes ClientTaskManager;
+ * 
+ * @param argc Number of command line arguments. 
+ * @param argv Array of strings with the command line arguments.
+ *
+ * @return Returns 0 if no errors occurred, 1 otherwise.
+ */
+int main(int argc, char* argv[]);
 #endif  // INCLUDE_CLIENT_H_
