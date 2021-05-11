@@ -4,7 +4,6 @@
 #include "lib.h"
 #include "delay.h"
 
-int delay;
 int c = 0;	// JMC
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
