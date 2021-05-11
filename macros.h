@@ -2,8 +2,8 @@
 #define INCLUDE_MACROS_H_ 1
 
 
-#define UNDEFINED_BUF 4
-#define DEFINED_BUF 6
+#define UNDEF_BUFSZ 4
+#define DEF_BUFSZ 6
 #define DEFAULT_BUFSZ 1
 #define PERM 0666
 #define MAX_BUF 1024
