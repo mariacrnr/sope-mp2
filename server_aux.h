@@ -6,9 +6,11 @@
 #include <dirent.h>
 #include <errno.h>
 #include <time.h>
+#include <semaphore.h>
 #include <pthread.h>
 
 #include "common.h"
+#include "lib.h"
 
 void registOperation(Message message, const char* oper);
 

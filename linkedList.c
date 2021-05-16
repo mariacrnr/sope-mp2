@@ -1,4 +1,4 @@
-#include "../include/linkedList.h"
+#include "linkedList.h"
 
 void startLinkedList(pthread_t thread, pthreadLinked** start) {
 
