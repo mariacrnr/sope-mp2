@@ -1,16 +1,35 @@
 #include "server.h"
 
+void sigHandler(int signo){
+    timeOut = 1;
+}
+
 void* routineProducer(void* arg) {
     Message* params = arg;
-    params->tskres = task(params->tskload);
+
+    //pthread_mutex_lock(&timeOutMutex);
+    params->tskres = (timeOut) ?  TSKTIMEOUT : task(params->tskload);
+    //pthread_mutex_unlock(&timeOutMutex);
     
+    printf("ESTOU PRESTES A ENTRAR NO SEMAFORO DO PRODUCER\n");
     sem_wait(&semBufferEmpty);
     pthread_mutex_lock(&bufferMutex);
-    buffer[counter] = *params;
-    counter++;
+
+    buffer[producerIndex] = *params;
+    producerIndex++;
+    producerIndex = producerIndex % bufsz;
+
+    printf("ESTOU DENTRO DO SEMAFORO DO PRODUCER!\n");
     pthread_mutex_unlock(&bufferMutex);
     sem_post(&semBufferFull);
+    
+    printf("ESTOU FORA DO SEMAFORO DO PRODUCER!\n");
 
+    Message serverMessage = *params;
+    parseMessage(&serverMessage);
+    registOperation(&serverMessage, "TSKEX");
+
+    free(params);
     pthread_exit(NULL);
 }   
 
@@ -20,29 +39,47 @@ void* routineConsumer(void* arg) {
     char* privateFifo = malloc(MAX_BUF);
     int privateID;
 
-
-    sem_wait(&semBufferFull);
-    pthread_mutex_lock(&bufferMutex);
-    message = buffer[counter - 1];
-    counter--;
-    pthread_mutex_unlock(&bufferMutex);
-    sem_post(&semBufferEmpty);
-    //envia para respetivo private fifo
     
-    snprintf(privateFifo, MAX_BUF, "/tmp/%d.%lu", message.pid, message.tid);
+    while(!timeOut){
+        printf("================ESTOU PRESTES A ENTRAR NO SEMAFORO DO CONSUMER================\n");
+        sem_wait(&semBufferFull);
+        pthread_mutex_lock(&bufferMutex);
+        printf("ESTOU DENTRO DO SEMAFORO CONSUMER!\n");
+        message = buffer[consumerIndex];
+        consumerIndex++;
+        consumerIndex = consumerIndex % bufsz;
 
-    if ((privateID = open(privateFifo, O_WRONLY)) < 0){
-        perror("Error opening private FIFO\n");
-        pthread_exit(NULL);
-    }  
+        pthread_mutex_unlock(&bufferMutex);
+        sem_post(&semBufferEmpty);
+        //envia para respetivo private fifo
+        
+        printf("==================ESTOU FORA DO SEMAFORO DO CONSUMER!=============\n");
+        
+        snprintf(privateFifo, MAX_BUF, "/tmp/%d.%lu", message.pid, message.tid);
 
-    message.tid = pthread_self();
-    message.pid = getpid();
+        parseMessage(&message);
 
-    if (write(privateID, &message, sizeof(message)) == -1) { 
-        perror("Error writing to private fifo");
-        pthread_exit(NULL);
-	}
+        printf("PRESTES A DAR OPEN DA PRIV FIFO\n");
+
+        if ((privateID = open(privateFifo, O_WRONLY)) < 0){
+            registOperation(&message, "FAILD");       
+        }else{
+            printf("PRESTES A DAR WRITE NA PRIV FIFO\n");
+
+            //pthread_mutex_lock(&timeOutMutex);
+            if(timeOut) registOperation(&message, "2LATE");
+            //pthread_mutex_unlock(&timeOutMutex);
+            
+            if (write(privateID, &message, sizeof(Message)) == -1) { 
+                registOperation(&message, "FAILD");
+            } else{
+                printf("PRESTES A REGOP\n");
+                registOperation(&message, "TSKDN");
+            }
+        } 
+
+        printf("<<<<<<<<<<<<<<<<DONE>>>>>>>>>>>>>>>\n");
+    }
     
     free(privateFifo);
 
@@ -60,8 +97,22 @@ int requestReceiver(int t, int publicFD, int bufferSize){
     pthreadLinked* current = NULL;  // Current pthread at linked list
 
 
-    time_t initT = time(NULL);      // Stores the while's first iteration's exact time 
-    time_t nowT;                    // Will store each while iteration's exact time
+    //time_t initT = time(NULL);      // Stores the while's first iteration's exact time 
+    //time_t nowT;                    // Will store each while iteration's exact time
+
+    struct sigaction new, old;
+	sigset_t smask;	// signals to mask during signal handler
+	sigemptyset(&smask);
+	new.sa_handler = sigHandler;
+	new.sa_mask = smask;
+	new.sa_flags = 0;	// usually enough
+
+	if(sigaction(SIGALRM, &new, &old) == -1) {
+		perror ("sigaction (SIGALRM)");
+        return 1;
+	}
+
+    alarm(t);
 
     buffer = malloc(sizeof(Message) * bufferSize);
 
@@ -72,15 +123,17 @@ int requestReceiver(int t, int publicFD, int bufferSize){
         return 1;
     }
     
-    while (time(&nowT) - initT < t) {
+    while (!timeOut) {
         
-        if ((ret = read(publicFD, &message, sizeof(message))) == sizeof(message)){
+        if ((ret = read(publicFD, &message, sizeof(Message))) == sizeof(Message)){
             nthreads++;
             Message* args = malloc(sizeof(*args));
 
             *args = message;
 
-            if (pthread_create(&thread, NULL, routineProducer, NULL) != 0) {  
+            registOperation(&message, "RECVD");
+
+            if (pthread_create(&thread, NULL, routineProducer, args) != 0) {  
                 free(args);
                 perror("Error creating new thread");
                 return 1;
@@ -93,7 +146,6 @@ int requestReceiver(int t, int publicFD, int bufferSize){
                 insertThread(thread, &current); // Adds new element to the linked list, which will be pointed to by the "current" pointer
             }
 
-            free(args);
         }
 
     }
@@ -109,6 +161,8 @@ int requestReceiver(int t, int publicFD, int bufferSize){
     
     while (current != NULL) { // Until the thread pointed to by the last thread is null
         if (pthread_join(current->thread, NULL) != 0) { // Join thread
+            free(buffer);
+            freeLinkedList(&start);
             perror("Error joining threads");
             return 1;
         }
@@ -124,11 +178,13 @@ int requestReceiver(int t, int publicFD, int bufferSize){
 
 int main(int argc, char* argv[]) {
     char* publicFIFO;
-    int nsecs, bufsz, publicFD;
+    int nsecs, publicFD;
 
     pthread_mutex_init(&bufferMutex, NULL);
-
-    counter = 0;
+    pthread_mutex_init(&timeOutMutex, NULL);
+    
+    producerIndex = 0;
+    consumerIndex = 0;
     
     switch(argc){
         case UNDEF_BUFSZ:
@@ -148,18 +204,7 @@ int main(int argc, char* argv[]) {
 
     sem_init(&semBufferEmpty, 0, bufsz);
     sem_init(&semBufferFull, 0, 0);
-
-    // if ((semBufferEmpty = sem_open("semBufferEmpty", O_CREAT, 0666, bufsz)) == SEM_FAILED) {
-    //     perror("Error inicializing the semaphore");
-    //     return 1;
-    // }
-
-    // if ((semBufferFull = sem_open("semBufferFull", O_CREAT, 0666, 0)) == SEM_FAILED) {
-    //     perror("Error inicializing the semaphore");
-    //     return 1;
-    // }
         
-
     nsecs = atoi(argv[2]);
 
     if (mkfifo(publicFIFO, PERM) == -1) { // Creates FIFO for communication between this thread and the server 
@@ -176,11 +221,11 @@ int main(int argc, char* argv[]) {
         perror("Error in requestReceiver\n");
     }
     
-    // sem_unlink("semBufferEmpty");
-    // sem_unlink("semBufferFull");
     sem_destroy(&semBufferEmpty);
     sem_destroy(&semBufferFull);
+    
     pthread_mutex_destroy(&bufferMutex);
+    pthread_mutex_destroy(&timeOutMutex);
 
     return 0;
 }

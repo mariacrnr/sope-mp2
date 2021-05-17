@@ -8,10 +8,11 @@
 #include <time.h>
 #include <semaphore.h>
 #include <pthread.h>
+#include <signal.h>
 
 #include "common.h"
 #include "lib.h"
 
-void registOperation(Message message, const char* oper);
+void registOperation(Message* message, const char* oper);
 
-void parseMessage(Message* message, int requestID, unsigned int seed);
+void parseMessage(Message* message);

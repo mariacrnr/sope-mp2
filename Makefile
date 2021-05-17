@@ -29,8 +29,8 @@
 
 all: s c
 
-s: server.o lib.o delay.c delay.h linkedList.c linkedList.h
-	gcc -Wall -DDELAY=100 -o s delay.c linkedList.c lib.o server.o -pthread
+s: server.o lib.o delay.c delay.h linkedList.c linkedList.h server_aux.c server_aux.h
+	gcc -Wall -DDELAY=100 -o s delay.c linkedList.c server_aux.c lib.o server.o -pthread
 
 c: client.c common.h
 	gcc -Wall -o c client.c -pthread
@@ -42,4 +42,4 @@ lib.o: lib.c lib.h delay.h
 	gcc -Wall -c -o lib.o lib.c
 
 clean:
-	rm -f s c server.o lib.o
+	rm -f s c server.o lib.o report

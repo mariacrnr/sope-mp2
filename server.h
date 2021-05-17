@@ -5,13 +5,18 @@
 sem_t semBufferEmpty;
 sem_t semBufferFull;
 Message* buffer;
-int counter;
+
+int producerIndex;
+int consumerIndex;
+
+int bufsz;
+int timeOut = 0;
 
 pthread_mutex_t bufferMutex;
+pthread_mutex_t timeOutMutex;
 
 void* routineProducer(void* arg);
 
 void* routineConsumer(void* arg);
 
 int requestReceiver(int t, int publicFD, int bufferSize);
-

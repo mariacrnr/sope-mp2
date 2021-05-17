@@ -8,5 +8,6 @@
 #define PERM 0666
 #define MAX_BUF 1024
 #define SLEEP_TIME 30000000
+#define TSKTIMEOUT -1
 
 #endif // INCLUDE_MACROS_H_

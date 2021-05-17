@@ -1,7 +1,0 @@
-{
-    "files.associations": {
-        "server.h": "c",
-        "macros.h": "c",
-        "linkedlist.h": "c"
-    }
-}
