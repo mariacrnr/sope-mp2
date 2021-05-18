@@ -10,7 +10,9 @@ int producerIndex;
 int consumerIndex;
 
 int bufsz;
-int timeOut = 0;
+int timeOut;
+int closeConsumer;
+int clientTimeOut;
 
 pthread_mutex_t bufferMutex;
 pthread_mutex_t timeOutMutex;
@@ -19,4 +21,4 @@ void* routineProducer(void* arg);
 
 void* routineConsumer(void* arg);
 
-int requestReceiver(int t, int publicFD, int bufferSize);
+int requestReceiver(int t, int publicFD, char* publicFIFO, int bufferSize);
