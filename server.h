@@ -16,6 +16,7 @@ int clientTimeOut;
 
 pthread_mutex_t bufferMutex;
 pthread_mutex_t timeOutMutex;
+pthread_mutex_t closeConsumerMutex;
 
 void* routineProducer(void* arg);
 
