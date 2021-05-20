@@ -7,8 +7,8 @@
 }*/
 
 void* routineProducer(void* arg) {
-    Message* params = arg;
-    
+    usleep(50000 + (rand() % 50000));
+    Message* params = arg; // forçar 2LATEs
     if(!timeOut){
         params->tskres = task(params->tskload);
 
@@ -218,6 +218,8 @@ int requestReceiver(int t, int publicFD, char * publicFIFO, int bufferSize){
 int main(int argc, char* argv[]) {
     char* publicFIFO;
     int nsecs, publicFD;
+
+    srand(time(NULL));
 
     pthread_mutex_init(&bufferMutex, NULL);
     pthread_mutex_init(&timeOutMutex, NULL);
