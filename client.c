@@ -158,7 +158,7 @@ int main(int argc, char** argv) {
 		}
 		// sleeps a random time until next request
 		usleep(10000 + (rand() % 10000));	// prepare new request
-// 		usleep(100 + (rand() % 100));	// good for forcing 2LATEs !
+ 		usleep(100 + (rand() % 100));	// good for forcing 2LATEs !
 
 		if (access(serverfifoname, F_OK) < 0) { // if server removed public FIFO
 			close (serverfifo);

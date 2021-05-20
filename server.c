@@ -9,9 +9,18 @@
 void* routineProducer(void* arg) {
     Message* params = arg;
 
-    //pthread_mutex_lock(&timeOutMutex);
-    //pthread_mutex_unlock(&timeOutMutex);
-    params->tskres = (timeOut) ?  TSKTIMEOUT : task(params->tskload);
+    if(!timeOut){
+        params->tskres = task(params->tskload);
+
+        Message serverMessage = *params;
+        parseMessage(&serverMessage);
+        registOperation(&serverMessage, "TSKEX");
+
+    } else{
+        params->tskres = TSKTIMEOUT;
+    }
+
+
     //printf("ESTOU PRESTES A ENTRAR NO SEMAFORO DO PRODUCER\n");
     sem_wait(&semBufferEmpty); // Fica preso no timeout do server
     pthread_mutex_lock(&bufferMutex);
@@ -25,9 +34,6 @@ void* routineProducer(void* arg) {
     pthread_mutex_unlock(&bufferMutex);
     sem_post(&semBufferFull);
     //printf("SAI DO SEMAFORO DO PRODUCER\n");
-    Message serverMessage = *params;
-    parseMessage(&serverMessage);
-    registOperation(&serverMessage, "TSKEX");
 
     free(params);
     pthread_exit(NULL);
@@ -38,16 +44,13 @@ void* routineConsumer(void* arg) {
     Message message;
     char privateFifo[MAX_BUF];
     int privateID;
-    int value = 0;
-
-    //pthread_mutex_lock(&closeConsumerMutex);
-    while(!closeConsumer || value != 0) {  // closeconsumer && value == 0
-        sem_getvalue(&semBufferFull, &value);
-        //pthread_mutex_unlock(&closeConsumerMutex);
-        //if (value == 0 && closeConsumer) break;
-        //printf("zzzzz STUCK zzzzz value: %d\n", value);
+    
+    while(1) {  // closeconsumer && value == 0
+        if(timeOut && !running) break;
         //printf("================ESTOU PRESTES A ENTRAR NO SEMAFORO DO CONSUMER================\n");
         if (sem_trywait(&semBufferFull) != 0) continue; // Fica preso no timeout do Cliente
+
+        //sem_wait(&semBufferFull);
        // printf("BEFORE BUFFERMUTEX \n");
         pthread_mutex_lock(&bufferMutex);
        // printf("ESTOU DENTRO DO SEMAFORO CONSUMER!\n");
@@ -72,28 +75,23 @@ void* routineConsumer(void* arg) {
         }else{
             //printf("PRESTES A DAR WRITE NA PRIV FIFO\n");
 
-
             if (write(privateID, &message, sizeof(Message)) < 0) { 
                 registOperation(&message, "FAILD");
             }
             else{
                 //pthread_mutex_lock(&timeOutMutex);
-                if(message.tskres == -1) registOperation(&message, "2LATE");
+                if(message.tskres == TSKTIMEOUT) registOperation(&message, "2LATE");
                 else registOperation(&message, "TSKDN");
                 //pthread_mutex_unlock(&timeOutMutex);
-            }
-            
-
+            }        
+            close(privateID);
         }
-
-        close(privateID);
+        pthread_mutex_lock(&runningMutex);
+        running--;
+        pthread_mutex_unlock(&runningMutex);
         
         //printf("<<<<<<<<<<<<<<<<DONE>>>>>>>>>>>>>>>\n");
-        //pthread_mutex_lock(&closeConsumerMutex);
     }
-    //pthread_mutex_unlock(&closeConsumerMutex);
-
-    //free(privateFifo);
     //printf("xxxxxxxxx Consumer exit xxxxxxxx \n\n\n");
     pthread_exit(NULL);
 
@@ -134,7 +132,7 @@ int requestReceiver(int t, int publicFD, char * publicFIFO, int bufferSize){
         perror("Error creating new thread");
         return 1;
     }
-    //(time(&nowT) - initT < t)
+
     while (time(&nowT) - initT < t) { // condição mal, ainda tem q ser feito
         if(time(&nowT) - initT >= t){
             //pthread_mutex_lock(&timeOutMutex);
@@ -150,11 +148,16 @@ int requestReceiver(int t, int publicFD, char * publicFIFO, int bufferSize){
 
             registOperation(&message, "RECVD");
 
+            pthread_mutex_lock(&runningMutex);
+            running++;
+            pthread_mutex_unlock(&runningMutex);
+
             if (pthread_create(&thread, NULL, routineProducer, args) != 0) {  
                 free(args);
                 perror("Error creating new thread");
                 return 1;
             }
+            
 
             if (nthreads == 1) { // If it is the first thread, startLinkedList is called and the linked list is initialized
                 startLinkedList(thread, &start); // Initializes the first element of the linked list, which will be pointed to by "start" pointer
@@ -213,6 +216,7 @@ int main(int argc, char* argv[]) {
 
     pthread_mutex_init(&bufferMutex, NULL);
     pthread_mutex_init(&timeOutMutex, NULL);
+    pthread_mutex_init(&runningMutex, NULL);
     //pthread_mutex_init(&closeConsumerMutex, NULL);
     
     producerIndex = 0;
@@ -220,6 +224,8 @@ int main(int argc, char* argv[]) {
 
     timeOut = 0;
     closeConsumer = 0;
+
+    running = 0;
     
     switch(argc){
         case UNDEF_BUFSZ:
@@ -262,6 +268,7 @@ int main(int argc, char* argv[]) {
     
     pthread_mutex_destroy(&bufferMutex);
     pthread_mutex_destroy(&timeOutMutex);
+    pthread_mutex_destroy(&runningMutex);
 
     return 0;
 }
