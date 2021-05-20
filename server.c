@@ -8,7 +8,7 @@
 
 void* routineProducer(void* arg) {
     Message* params = arg;
-
+    
     if(!timeOut){
         params->tskres = task(params->tskload);
 
@@ -19,6 +19,7 @@ void* routineProducer(void* arg) {
     } else{
         params->tskres = TSKTIMEOUT;
     }
+
 
 
     //printf("ESTOU PRESTES A ENTRAR NO SEMAFORO DO PRODUCER\n");
@@ -44,16 +45,16 @@ void* routineConsumer(void* arg) {
     Message message;
     char privateFifo[MAX_BUF];
     int privateID;
-    
+    //printf("A entrar no while(1) consumer \n");
     while(1) {  // closeconsumer && value == 0
         if(timeOut && !running) break;
         //printf("================ESTOU PRESTES A ENTRAR NO SEMAFORO DO CONSUMER================\n");
         if (sem_trywait(&semBufferFull) != 0) continue; // Fica preso no timeout do Cliente
 
         //sem_wait(&semBufferFull);
-       // printf("BEFORE BUFFERMUTEX \n");
+        //printf("BEFORE BUFFERMUTEX \n");
         pthread_mutex_lock(&bufferMutex);
-       // printf("ESTOU DENTRO DO SEMAFORO CONSUMER!\n");
+        //printf("ESTOU DENTRO DO SEMAFORO CONSUMER!\n");
         message = buffer[consumerIndex];
         consumerIndex++;
         consumerIndex %= bufsz;
@@ -86,6 +87,7 @@ void* routineConsumer(void* arg) {
             }        
             close(privateID);
         }
+        //printf("Antes do runningMutex\n");
         pthread_mutex_lock(&runningMutex);
         running--;
         pthread_mutex_unlock(&runningMutex);
@@ -170,6 +172,8 @@ int requestReceiver(int t, int publicFD, char * publicFIFO, int bufferSize){
 
     }
 
+    //printf("fora while pthread\n");
+
     timeOut = 1;
     
     remove(publicFIFO); // ou unlink
@@ -195,13 +199,14 @@ int requestReceiver(int t, int publicFD, char * publicFIFO, int bufferSize){
     }while(value != 0);
     
     kill(getpid(),SIGKILL);*/
-
+    //printf("producer foi joined\n");
     if (pthread_join(consumerThread, NULL) != 0) { //Joins Consumer thread
         free(buffer);
         freeLinkedList(&start);
         perror("Error joining threads");
         return 1;
     }
+    //printf("consumer foi joined\n");
 
     free(buffer);
     freeLinkedList(&start);
