@@ -1,11 +1,5 @@
 #include "server.h"
 
-/*void sigHandler(int signo){
-    pthread_mutex_lock(&closeConsumerMutex);
-    closeConsumer = 1;
-    pthread_mutex_unlock(&closeConsumerMutex);
-}*/
-
 void* routineProducer(void* arg) {
     usleep(50000 + (rand() % 50000));
     Message* params = arg; // forçar 2LATEs
@@ -20,21 +14,15 @@ void* routineProducer(void* arg) {
         params->tskres = TSKTIMEOUT;
     }
 
-
-
-    //printf("ESTOU PRESTES A ENTRAR NO SEMAFORO DO PRODUCER\n");
-    sem_wait(&semBufferEmpty); // Fica preso no timeout do server
+    sem_wait(&semBufferEmpty);
     pthread_mutex_lock(&bufferMutex);
 
-    //printf("ESTOU DENTRO DO SEMAFORO DO PRODUCER!\n");
     buffer[producerIndex] = *params;
     producerIndex++;
     producerIndex %= bufsz;
 
-    //printf("ESTOU PRESTES A SAIR DO SEMAFORO DO PRODUCER!\n");
     pthread_mutex_unlock(&bufferMutex);
     sem_post(&semBufferFull);
-    //printf("SAI DO SEMAFORO DO PRODUCER\n");
 
     free(params);
     pthread_exit(NULL);
@@ -45,58 +33,47 @@ void* routineConsumer(void* arg) {
     Message message;
     char privateFifo[MAX_BUF];
     int privateID;
-    //printf("A entrar no while(1) consumer \n");
-    while(1) {  // closeconsumer && value == 0
+    while(1) { 
         if(timeOut && !running) break;
-        //printf("================ESTOU PRESTES A ENTRAR NO SEMAFORO DO CONSUMER================\n");
-        if (sem_trywait(&semBufferFull) != 0) continue; // Fica preso no timeout do Cliente
 
-        //sem_wait(&semBufferFull);
-        //printf("BEFORE BUFFERMUTEX \n");
+        if (sem_trywait(&semBufferFull) != 0) continue;
+
         pthread_mutex_lock(&bufferMutex);
-        //printf("ESTOU DENTRO DO SEMAFORO CONSUMER!\n");
+
         message = buffer[consumerIndex];
         consumerIndex++;
         consumerIndex %= bufsz;
 
         pthread_mutex_unlock(&bufferMutex);
         sem_post(&semBufferEmpty);
-        //envia para respetivo private fifo
-        
-        //printf("==================ESTOU FORA DO SEMAFORO DO CONSUMER!=============\n");
         
         snprintf(privateFifo, MAX_BUF, "/tmp/%d.%lu", message.pid, message.tid);
 
         parseMessage(&message);
 
-        //printf("PRESTES A DAR OPEN DA PRIV FIFO\n");
-
         if ((privateID = open(privateFifo, O_WRONLY)) < 0){
             registOperation(&message, "FAILD");    
         }else{
-            //printf("PRESTES A DAR WRITE NA PRIV FIFO\n");
 
             if (write(privateID, &message, sizeof(Message)) < 0) { 
                 registOperation(&message, "FAILD");
             }
             else{
-                //pthread_mutex_lock(&timeOutMutex);
+
                 if(message.tskres == TSKTIMEOUT) registOperation(&message, "2LATE");
                 else registOperation(&message, "TSKDN");
-                //pthread_mutex_unlock(&timeOutMutex);
+
             }        
             close(privateID);
         }
-        //printf("Antes do runningMutex\n");
+
         pthread_mutex_lock(&runningMutex);
         running--;
         pthread_mutex_unlock(&runningMutex);
         
-        //printf("<<<<<<<<<<<<<<<<DONE>>>>>>>>>>>>>>>\n");
     }
-    //printf("xxxxxxxxx Consumer exit xxxxxxxx \n\n\n");
+    
     pthread_exit(NULL);
-
 }
 
 int requestReceiver(int t, int publicFD, char * publicFIFO, int bufferSize){
@@ -112,19 +89,6 @@ int requestReceiver(int t, int publicFD, char * publicFIFO, int bufferSize){
     time_t initT = time(NULL);      // Stores the while's first iteration's exact time 
     time_t nowT;                    // Will store each while iteration's exact time
 
-    /*struct sigaction new, old;
-	sigset_t smask;	// signals to mask during signal handler
-	sigemptyset(&smask);
-	new.sa_handler = sigHandler;
-	new.sa_mask = smask;
-	new.sa_flags = 0;	// usually enough
-
-	if(sigaction(SIGKILL, &new, &old) == -1) {
-		perror ("sigaction (SIGUSR1)");
-        return 1;
-	}*/
-
-    //alarm(t);
 
     buffer = malloc(sizeof(Message) * bufferSize);
 
@@ -136,13 +100,9 @@ int requestReceiver(int t, int publicFD, char * publicFIFO, int bufferSize){
     }
 
     while (time(&nowT) - initT < t) { // condição mal, ainda tem q ser feito
-        if(time(&nowT) - initT >= t){
-            //pthread_mutex_lock(&timeOutMutex);
-            timeOut = 1;
-            //pthread_mutex_unlock(&timeOutMutex);
-        } 
+        if(time(&nowT) - initT >= t)  timeOut = 1;
 
-        if ((ret = read(publicFD, &message, sizeof(Message))) == sizeof(Message)){ //6
+        if ((ret = read(publicFD, &message, sizeof(Message))) == sizeof(Message)){
             nthreads++;
             Message* args = malloc(sizeof(*args));
 
@@ -172,7 +132,6 @@ int requestReceiver(int t, int publicFD, char * publicFIFO, int bufferSize){
 
     }
 
-    //printf("fora while pthread\n");
 
     timeOut = 1;
     
@@ -189,28 +148,18 @@ int requestReceiver(int t, int publicFD, char * publicFIFO, int bufferSize){
         }
         current = current->next; // Jumps to next thread
     }
-    //pthread_mutex_lock(&closeConsumerMutex);
+    
     closeConsumer = 1;
-    //pthread_mutex_unlock(&closeConsumerMutex);
-    
-    /*int value;
-    do{
-        sem_getvalue(&semBufferFull, &value);
-    }while(value != 0);
-    
-    kill(getpid(),SIGKILL);*/
-    //printf("producer foi joined\n");
+
     if (pthread_join(consumerThread, NULL) != 0) { //Joins Consumer thread
         free(buffer);
         freeLinkedList(&start);
         perror("Error joining threads");
         return 1;
     }
-    //printf("consumer foi joined\n");
 
     free(buffer);
     freeLinkedList(&start);
-    //close(publicFD); // Ceases communication between server and client
     return 0;
 }
 
