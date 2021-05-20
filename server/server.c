@@ -50,10 +50,17 @@ void* routineConsumer(void* arg) {
         snprintf(privateFifo, MAX_BUF, "/tmp/%d.%lu", message.pid, message.tid);// Names a FIFO based on the process id and thread id
 
         parseMessage(&message);
+        int wait = 3;
+        parseMessage(&message);
+	    do {
+	      privateID = open(privateFifo,O_WRONLY);
+	      if (privateID > -1) break;
+	      usleep(100000);
+	      wait--;
+    	} while (wait > -1);
 
-        if ((privateID = open(privateFifo, O_WRONLY)) < 0){ 
-            registOperation(&message, "FAILD");    
-        }else{
+	    if(wait <0) registOperation(&message, "FAILD");
+        else{
 
             if (write(privateID, &message, sizeof(Message)) < 0) { 
                 registOperation(&message, "FAILD");
@@ -114,10 +121,9 @@ int requestReceiver(int t, int publicFD, char * publicFIFO, int bufferSize){
             running++;
             pthread_mutex_unlock(&runningMutex);
 
-            if (pthread_create(&thread, NULL, routineProducer, args) != 0) {  
-                free(args);
-                perror("Error creating new thread");
-                return 1;
+            while (pthread_create(&thread, NULL, routineProducer, args) != 0) {  
+                usleep(1000);
+                //perror("Error creating new thread");
             }
             
 
