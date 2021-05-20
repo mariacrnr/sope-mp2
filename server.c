@@ -1,28 +1,28 @@
 #include "server.h"
 
 void* routineProducer(void* arg) {
-    usleep(50000 + (rand() % 50000));
-    Message* params = arg; // forçar 2LATEs
-    if(!timeOut){
-        params->tskres = task(params->tskload);
+    usleep(50000 + (rand() % 50000)); 
+    Message* params = arg;
+    if(!timeOut){ 
+        params->tskres = task(params->tskload); //Lib function that gets the result of the task
 
         Message serverMessage = *params;
-        parseMessage(&serverMessage);
-        registOperation(&serverMessage, "TSKEX");
+        parseMessage(&serverMessage); // Initializes the various attributes of this Message instance
+        registOperation(&serverMessage, "TSKEX"); 
 
     } else{
         params->tskres = TSKTIMEOUT;
     }
 
-    sem_wait(&semBufferEmpty);
+    sem_wait(&semBufferEmpty); //Used to decrement the number of empty slots available at the buffer
     pthread_mutex_lock(&bufferMutex);
 
-    buffer[producerIndex] = *params;
+    buffer[producerIndex] = *params; //Array of messages corresponding to each request
     producerIndex++;
     producerIndex %= bufsz;
 
     pthread_mutex_unlock(&bufferMutex);
-    sem_post(&semBufferFull);
+    sem_post(&semBufferFull);  //Used to decrement the number of occupied slots at the buffer
 
     free(params);
     pthread_exit(NULL);
@@ -33,25 +33,25 @@ void* routineConsumer(void* arg) {
     Message message;
     char privateFifo[MAX_BUF];
     int privateID;
-    while(1) { 
+    while(1) {  //Checks the buffer continually for results to the requests until the server times out or all the requests have been answered
         if(timeOut && !running) break;
 
         if (sem_trywait(&semBufferFull) != 0) continue;
 
-        pthread_mutex_lock(&bufferMutex);
+        pthread_mutex_lock(&bufferMutex); 
 
-        message = buffer[consumerIndex];
+        message = buffer[consumerIndex];  
         consumerIndex++;
         consumerIndex %= bufsz;
 
         pthread_mutex_unlock(&bufferMutex);
         sem_post(&semBufferEmpty);
         
-        snprintf(privateFifo, MAX_BUF, "/tmp/%d.%lu", message.pid, message.tid);
+        snprintf(privateFifo, MAX_BUF, "/tmp/%d.%lu", message.pid, message.tid);// Names a FIFO based on the process id and thread id
 
         parseMessage(&message);
 
-        if ((privateID = open(privateFifo, O_WRONLY)) < 0){
+        if ((privateID = open(privateFifo, O_WRONLY)) < 0){ 
             registOperation(&message, "FAILD");    
         }else{
 
@@ -99,7 +99,7 @@ int requestReceiver(int t, int publicFD, char * publicFIFO, int bufferSize){
         return 1;
     }
 
-    while (time(&nowT) - initT < t) { // condição mal, ainda tem q ser feito
+    while (time(&nowT) - initT < t) { 
         if(time(&nowT) - initT >= t)  timeOut = 1;
 
         if ((ret = read(publicFD, &message, sizeof(Message))) == sizeof(Message)){
@@ -135,12 +135,12 @@ int requestReceiver(int t, int publicFD, char * publicFIFO, int bufferSize){
 
     timeOut = 1;
     
-    remove(publicFIFO); // ou unlink
+    remove(publicFIFO);
 
     current = start; // Starting at the first thread
 
     while (current != NULL) { // Until the thread pointed to by the last thread is null
-        if (pthread_join(current->thread, NULL) != 0) { // Join ProducerThreads
+        if (pthread_join(current->thread, NULL) != 0) { // Joins ProducerThreads
             free(buffer);
             freeLinkedList(&start);
             perror("Error joining threads");
