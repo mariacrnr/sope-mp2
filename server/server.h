@@ -11,13 +11,9 @@ int consumerIndex;
 
 int bufsz;
 int timeOut;
-int closeConsumer;
-int clientTimeOut;
 int running;
 
 pthread_mutex_t bufferMutex;
-pthread_mutex_t timeOutMutex;
-pthread_mutex_t closeConsumerMutex;
 pthread_mutex_t runningMutex;
 
 

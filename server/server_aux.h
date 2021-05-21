@@ -13,6 +13,6 @@
 #include "common.h"
 #include "lib.h"
 
-void registOperation(Message* message, const char* oper);
+void registOperation(Message message, const char* oper);
 
 void parseMessage(Message* message);

@@ -1,14 +1,14 @@
 #include "server.h"
 
 void* routineProducer(void* arg) {
-    usleep(50000 + (rand() % 50000)); 
+    usleep(50000); 
     Message* params = arg;
     if(!timeOut){ 
         params->tskres = task(params->tskload); //Lib function that gets the result of the task
 
         Message serverMessage = *params;
         parseMessage(&serverMessage); // Initializes the various attributes of this Message instance
-        registOperation(&serverMessage, "TSKEX"); 
+        registOperation(serverMessage, "TSKEX"); 
 
     } else{
         params->tskres = TSKTIMEOUT;
@@ -48,27 +48,20 @@ void* routineConsumer(void* arg) {
         sem_post(&semBufferEmpty);
         
         snprintf(privateFifo, MAX_BUF, "/tmp/%d.%lu", message.pid, message.tid);// Names a FIFO based on the process id and thread id
-
-        parseMessage(&message);
-        int wait = 3;
-        parseMessage(&message);
-	    do {
-	      privateID = open(privateFifo,O_WRONLY);
-	      if (privateID > -1) break;
-	      usleep(100000);
-	      wait--;
-    	} while (wait > -1);
-
-	    if(wait <0) registOperation(&message, "FAILD");
+        
+	    parseMessage(&message);
+        
+	    if ((privateID = open(privateFifo, O_WRONLY)) < 0)
+            registOperation(message, "FAILD");
         else{
 
             if (write(privateID, &message, sizeof(Message)) < 0) { 
-                registOperation(&message, "FAILD");
+                registOperation(message, "FAILD");
             }
             else{
 
-                if(message.tskres == TSKTIMEOUT) registOperation(&message, "2LATE");
-                else registOperation(&message, "TSKDN");
+                if(message.tskres == TSKTIMEOUT) registOperation(message, "2LATE");
+                else registOperation(message, "TSKDN");
 
             }        
             close(privateID);
@@ -79,7 +72,6 @@ void* routineConsumer(void* arg) {
         pthread_mutex_unlock(&runningMutex);
         
     }
-    
     pthread_exit(NULL);
 }
 
@@ -106,16 +98,16 @@ int requestReceiver(int t, int publicFD, char * publicFIFO, int bufferSize){
         return 1;
     }
 
-    while (time(&nowT) - initT < t) { 
-        if(time(&nowT) - initT >= t)  timeOut = 1;
+    while (1) { 
+        if (time(&nowT) - initT >= t)  break;
 
-        if ((ret = read(publicFD, &message, sizeof(Message))) == sizeof(Message)){
+        if ((ret = read(publicFD, &message, sizeof(Message))) == sizeof(Message)) {
             nthreads++;
             Message* args = malloc(sizeof(*args));
 
             *args = message;
 
-            registOperation(&message, "RECVD");
+            registOperation(message, "RECVD");
 
             pthread_mutex_lock(&runningMutex);
             running++;
@@ -140,7 +132,8 @@ int requestReceiver(int t, int publicFD, char * publicFIFO, int bufferSize){
 
 
     timeOut = 1;
-    
+
+    close(publicFD);
     remove(publicFIFO);
 
     current = start; // Starting at the first thread
@@ -155,7 +148,6 @@ int requestReceiver(int t, int publicFD, char * publicFIFO, int bufferSize){
         current = current->next; // Jumps to next thread
     }
     
-    closeConsumer = 1;
 
     if (pthread_join(consumerThread, NULL) != 0) { //Joins Consumer thread
         free(buffer);
@@ -174,18 +166,13 @@ int main(int argc, char* argv[]) {
     char* publicFIFO;
     int nsecs, publicFD;
 
-    srand(time(NULL));
-
     pthread_mutex_init(&bufferMutex, NULL);
-    pthread_mutex_init(&timeOutMutex, NULL);
     pthread_mutex_init(&runningMutex, NULL);
-    //pthread_mutex_init(&closeConsumerMutex, NULL);
     
     producerIndex = 0;
     consumerIndex = 0;
 
     timeOut = 0;
-    closeConsumer = 0;
 
     running = 0;
     
@@ -229,8 +216,8 @@ int main(int argc, char* argv[]) {
     sem_destroy(&semBufferFull);
     
     pthread_mutex_destroy(&bufferMutex);
-    pthread_mutex_destroy(&timeOutMutex);
     pthread_mutex_destroy(&runningMutex);
+
 
     return 0;
 }
