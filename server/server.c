@@ -70,7 +70,7 @@ void* routineConsumer(void* arg) {
     pthread_exit(NULL);
 }
 
-int requestReceiver(int t, int publicFD, char * publicFIFO, int bufferSize){
+int requestReceiver(int t, int publicFD) {
     int nthreads = 0; // Thread counter
     Message message;
     pthread_t thread; // Declares a pthread_t variable, where a producer thread will be created at every while loop iteration
@@ -84,7 +84,7 @@ int requestReceiver(int t, int publicFD, char * publicFIFO, int bufferSize){
     time_t nowT;                    // Will store each while iteration's exact time
 
 
-    buffer = malloc(sizeof(Message) * bufferSize);
+    buffer = malloc(sizeof(Message) * bufsz);
 
 
     if (pthread_create(&consumerThread, NULL, routineConsumer, NULL) != 0) {  
@@ -96,7 +96,6 @@ int requestReceiver(int t, int publicFD, char * publicFIFO, int bufferSize){
     while (1) { 
         if (time(&nowT) - initT >= t) { // Verifies if time elapsed since first iteration exceeds maximum time
             close(publicFD);
-            remove(publicFIFO);
             timeOut = 1;
             break;
         }
@@ -130,7 +129,6 @@ int requestReceiver(int t, int publicFD, char * publicFIFO, int bufferSize){
 
 
     close(publicFD); // Ceases communication between server and client
-    remove(publicFIFO);
 
     current = start; // Starting at the first thread
 
@@ -202,10 +200,11 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    if (requestReceiver(nsecs, publicFD, publicFIFO, bufsz) == 1) { // Invokes requestReceiver and handles errors 
+    if (requestReceiver(nsecs, publicFD) == 1) { // Invokes requestReceiver and handles errors 
         perror("Error in requestReceiver\n");
     }
     
+    remove(publicFIFO);
     
     sem_destroy(&semBufferEmpty);
     sem_destroy(&semBufferFull);

@@ -62,12 +62,10 @@ void* routineConsumer(void* arg);
  *
  * @param t Time in seconds until server times out
  * @param publicFD File Descriptor of the public FIFO
- * @param publicFIFO ??
- * @param bufferSize ??
  * 
  * @return Returns 0 if no errors occured, 1 otherwise.
  */
-int requestReceiver(int t, int publicFD, char* publicFIFO, int bufferSize);
+int requestReceiver(int t, int publicFD);
 
 /**
  * @brief Main function of the Server program that parses the command line arguments, 
