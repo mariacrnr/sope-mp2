@@ -1,5 +1,5 @@
-#ifndef _COMMON_H
-#define _COMMON_H 1
+#ifndef SERVER_COMMON_H_
+#define SERVER_COMMON_H_ 1
 typedef struct {
 	int rid; 										// request id
 	pid_t pid; 										// process id
@@ -7,4 +7,4 @@ typedef struct {
 	int tskload;									// task load
 	int tskres;										// task result
 } Message;
-#endif // _COMMON_H
+#endif // SERVER_COMMON_H_

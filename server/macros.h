@@ -1,5 +1,5 @@
-#ifndef INCLUDE_MACROS_H_
-#define INCLUDE_MACROS_H_ 1
+#ifndef SERVER_MACROS_H_
+#define SERVER_MACROS_H_ 1
 
 
 #define UNDEF_BUFSZ 4
@@ -10,4 +10,4 @@
 #define SLEEP_TIME 30000000
 #define TSKTIMEOUT -1
 
-#endif // INCLUDE_MACROS_H_
+#endif // SERVER_MACROS_H_

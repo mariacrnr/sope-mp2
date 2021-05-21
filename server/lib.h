@@ -1,4 +1,4 @@
-#ifndef _LIB_H
-#define _LIB_H 1
+#ifndef SERVER_LIB_H_
+#define SERVER_LIB_H_ 1
 int task(int level);
-#endif // _LIB_H
+#endif // SERVER_LIB_H_

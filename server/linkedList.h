@@ -1,5 +1,5 @@
-#ifndef INCLUDE_LINKEDLIST_H_
-#define INCLUDE_LINKEDLIST_H_ 1
+#ifndef SERVER_LINKEDLIST_H_
+#define SERVER_LINKEDLIST_H_ 1
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,4 +39,4 @@ void insertThread(pthread_t thread, pthreadLinked** current);
  */
 void freeLinkedList(pthreadLinked**  start);
 
-#endif // INCLUDE_LINKEDLIST_H_
+#endif // SERVER_LINKEDLIST_H_
