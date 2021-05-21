@@ -206,7 +206,7 @@ int main(int argc, char* argv[]) {
 	new.sa_handler = pipeHandler;
 	new.sa_mask = smask;
 	new.sa_flags = 0;	
-	if(sigaction(SIGPIPE, &new, NULL) == -1) {
+	if(sigaction(SIGPIPE, &new, NULL) == -1) { //Creates signal handler to catch SIGPIPE when the public FIFO is removed
 		perror ("sigaction (SIGPIPE)");
 		return 1;
 	}
