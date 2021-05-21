@@ -30,7 +30,6 @@ void registOperation(Message message, const char* oper);
  * @brief Function that completes the "message" variable.
  * 
  * @param message variable to be completed
- * @param requestID ID of the client request. 
  * 
  */
 void parseMessage(Message* message);

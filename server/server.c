@@ -117,9 +117,8 @@ int requestReceiver(int t, int publicFD, char * publicFIFO){
             unreadMessages++;
             pthread_mutex_unlock(&unreadMessagesMutex);
 
-             // If thread creation fails, waits 1000 microseconds and tries again.
+             // If thread creation fails, waits 1000 microseconds (optionally) and tries again.
             while(pthread_create(&thread, NULL, routineProducer, args) != 0) {  
-                
                 //usleep(1000);
             }
             
@@ -167,8 +166,6 @@ int requestReceiver(int t, int publicFD, char * publicFIFO){
 int main(int argc, char* argv[]) {
     char* publicFIFO;
     int nsecs, publicFD;
-    
-    srand(time(NULL));
 
     producerIndex = 0;
     consumerIndex = 0;
@@ -206,7 +203,7 @@ int main(int argc, char* argv[]) {
 	new.sa_handler = pipeHandler;
 	new.sa_mask = smask;
 	new.sa_flags = 0;	
-	if(sigaction(SIGPIPE, &new, NULL) == -1) { //Creates signal handler to catch SIGPIPE when the public FIFO is removed
+	if(sigaction(SIGPIPE, &new, NULL) == -1) { //Creates signal handler to catch SIGPIPE
 		perror ("sigaction (SIGPIPE)");
 		return 1;
 	}
