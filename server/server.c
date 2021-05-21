@@ -1,18 +1,13 @@
 #include "server.h"
 
 void* routineProducer(void* arg) {
-    usleep(50000); 
+    usleep(2000); 
     Message* params = arg;
-    if(!timeOut){ 
-        params->tskres = task(params->tskload); //Lib function that gets the result of the task
+    params->tskres = (timeOut) ? TSKTIMEOUT : task(params->tskload);
 
-        Message serverMessage = *params;
-        parseMessage(&serverMessage); // Initializes the various attributes of this Message instance
-        registOperation(serverMessage, "TSKEX"); 
-
-    } else{
-        params->tskres = TSKTIMEOUT;
-    }
+    Message serverMessage = *params;
+    parseMessage(&serverMessage); // Initializes the various attributes of this Message instance
+    registOperation(serverMessage, "TSKEX");
 
     sem_wait(&semBufferEmpty); //Used to decrement the number of empty slots available at the buffer
     pthread_mutex_lock(&bufferMutex);
@@ -99,7 +94,12 @@ int requestReceiver(int t, int publicFD, char * publicFIFO, int bufferSize){
     }
 
     while (1) { 
-        if (time(&nowT) - initT >= t)  break;
+        if (time(&nowT) - initT >= t){
+            close(publicFD);
+            remove(publicFIFO);
+            timeOut = 1;
+            break;
+        }
 
         if ((ret = read(publicFD, &message, sizeof(Message))) == sizeof(Message)) {
             nthreads++;
@@ -130,8 +130,6 @@ int requestReceiver(int t, int publicFD, char * publicFIFO, int bufferSize){
 
     }
 
-
-    timeOut = 1;
 
     close(publicFD);
     remove(publicFIFO);
