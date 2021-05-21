@@ -1,24 +1,29 @@
 #include "server.h"
 
 void* routineProducer(void* arg) {
-    usleep(2000); 
+    usleep(50000); 
+    Message* params = arg;
+    if(!timeOut){ 
+        
+        params->tskres = task(params->tskload); //Lib function that gets the result of the task
 
-    Message* params = arg; // Casts arg from void* to Message*
-    params->tskres = (timeOut) ? TSKTIMEOUT : task(params->tskload);
+        Message serverMessage = *params;
+        parseMessage(&serverMessage); // Initializes the various attributes of this Message instance
+        registOperation(serverMessage, "TSKEX"); 
 
-    Message serverMessage = *params; // Copy of params used to preserve original message 
-    parseMessage(&serverMessage); // Initializes the various attributes of this Message instance
-    registOperation(serverMessage, "TSKEX");
+    } else {
+        params->tskres = TSKTIMEOUT;
+    }
 
-    sem_wait(&semBufferEmpty); // Used to decrement the number of available slots at the buffer, waits if none is available
+    sem_wait(&semBufferEmpty); //Used to decrement the number of empty slots available at the buffer
     pthread_mutex_lock(&bufferMutex);
 
-    buffer[producerIndex] = *params; // Writes to buffer each request's message
+    buffer[producerIndex] = *params; //Array of messages corresponding to each request
     producerIndex++;
-    producerIndex %= bufsz; // Reutilizes previously used buffer indexes and prevents segmentation fault
+    producerIndex %= bufsz;
 
     pthread_mutex_unlock(&bufferMutex);
-    sem_post(&semBufferFull);  // Used to increment the number of available slots at the buffer
+    sem_post(&semBufferFull);  //Used to decrement the number of occupied slots at the buffer
 
     free(params);
     pthread_exit(NULL);
@@ -26,15 +31,13 @@ void* routineProducer(void* arg) {
 
 void* routineConsumer(void* arg) {
     
-    Message message;
+    Message message ;
     char privateFifo[MAX_BUF];
     int privateID;
-    while (1) {
-        if (timeOut && (unreadMessages == 0)) break; // If server timed out and all messages on buffer were already read, break loop
-
-        if (sem_trywait(&semBufferFull) != 0) // Used to decrement the number of messages to be read
-            continue; // If there's no message to be read, iterates while loop again
-
+    while(1) {  //Checks the buffer continually for results to the requests until the server times out or all the requests have been answered
+        if(timeOut && (running == 0)) break;
+        usleep(10000);
+        if (sem_trywait(&semBufferFull) != 0) continue;
         pthread_mutex_lock(&bufferMutex); 
 
         message = buffer[consumerIndex];  
@@ -44,37 +47,39 @@ void* routineConsumer(void* arg) {
         pthread_mutex_unlock(&bufferMutex);
         sem_post(&semBufferEmpty);
         
-        snprintf(privateFifo, MAX_BUF, "/tmp/%d.%lu", message.pid, message.tid); // Names a FIFO based on the process id and thread id
-        
-	    parseMessage(&message);
-        
-	    if ((privateID = open(privateFifo, O_WRONLY)) < 0)
-            registOperation(message, "FAILD"); // If fifo failed to open, send FAILD
-        else{
+        snprintf(privateFifo, MAX_BUF, "/tmp/%d.%lu", message.pid, message.tid);// Names a FIFO based on the process id and thread id
+
+        parseMessage(&message);
+
+        if ((privateID = open(privateFifo, O_WRONLY | O_NONBLOCK)) < 0){ 
+            registOperation(message, "FAILD");    
+        }else{
 
             if (write(privateID, &message, sizeof(Message)) < 0) { 
-                registOperation(message, "FAILD"); // If write failed, send FAILD
-            } else {
-                // Sends 2LATE if server timed out
+                registOperation(message, "FAILD");
+            }
+            else{
+
                 if (message.tskres == TSKTIMEOUT) registOperation(message, "2LATE");
-                else registOperation(message, "TSKDN"); // If no problem occured, send TSKDN
+                else registOperation(message, "TSKDN");
+
             }        
             close(privateID);
         }
 
-        pthread_mutex_lock(&unreadMessagesMutex);
-        unreadMessages--;
-        pthread_mutex_unlock(&unreadMessagesMutex);
+        pthread_mutex_lock(&runningMutex);
+        running--;
+        pthread_mutex_unlock(&runningMutex);
         
     }
+    
     pthread_exit(NULL);
 }
 
-int requestReceiver(int t, int publicFD) {
-    int nthreads = 0; // Thread counter
+int requestReceiver(int t, int publicFD, char * publicFIFO){
+    int nthreads = 0;
     Message message;
-    pthread_t thread; // Declares a pthread_t variable, where a producer thread will be created at every while loop iteration
-    pthread_t consumerThread; // Declares a pthread_t variable, created once before main loop
+    pthread_t thread, consumerThread;
 
     pthreadLinked* start = NULL;    // First pthread at linked list. Is used as a pseudo constant variable, since the first element rarely changes
     pthreadLinked* current = NULL;  // Current pthread at linked list
@@ -93,27 +98,24 @@ int requestReceiver(int t, int publicFD) {
         return 1;
     }
 
-    while (1) { 
-        if (time(&nowT) - initT >= t) { // Verifies if time elapsed since first iteration exceeds maximum time
-            close(publicFD);
-            timeOut = 1;
-            break;
-        }
+    while (time(&nowT) - initT < t) { 
 
-        if (read(publicFD, &message, sizeof(Message)) == sizeof(Message)) {
+        if (read(publicFD, &message, sizeof(Message)) == sizeof(Message)){
             nthreads++;
-            Message* args = malloc(sizeof(*args)); // Will store each thread's arguments
+            Message* args = malloc(sizeof(*args));
 
             *args = message;
 
             registOperation(message, "RECVD");
 
-            // If thread creation fails, waits 1000 microseconds and tries again.
-            while (pthread_create(&thread, NULL, routineProducer, args) != 0) usleep(1000);
+            pthread_mutex_lock(&runningMutex);
+            running++;
+            pthread_mutex_unlock(&runningMutex);
 
-            pthread_mutex_lock(&unreadMessagesMutex);
-            unreadMessages++;
-            pthread_mutex_unlock(&unreadMessagesMutex);
+            while(pthread_create(&thread, NULL, routineProducer, args) != 0) {  
+                
+                //usleep(1000);
+            }
             
 
             if (nthreads == 1) { // If it is the first thread, startLinkedList is called and the linked list is initialized
@@ -127,8 +129,10 @@ int requestReceiver(int t, int publicFD) {
 
     }
 
-
-    close(publicFD); // Ceases communication between server and client
+    timeOut = 1;
+    
+    //close(publicFD);
+    remove(publicFIFO);
 
     current = start; // Starting at the first thread
 
@@ -141,7 +145,6 @@ int requestReceiver(int t, int publicFD) {
         }
         current = current->next; // Jumps to next thread
     }
-    
 
     if (pthread_join(consumerThread, NULL) != 0) { //Joins Consumer thread
         free(buffer);
@@ -159,23 +162,23 @@ int requestReceiver(int t, int publicFD) {
 int main(int argc, char* argv[]) {
     char* publicFIFO;
     int nsecs, publicFD;
-
-    pthread_mutex_init(&bufferMutex, NULL);
-    pthread_mutex_init(&unreadMessagesMutex, NULL);
     
+    srand(time(NULL));
+
     producerIndex = 0;
     consumerIndex = 0;
 
     timeOut = 0;
-    unreadMessages = 0;
+
+    running = 0;
     
-    switch(argc) {
-        case UNDEF_BUFSZ: // If -l flag not present in commmand line arguments
+    switch(argc){
+        case UNDEF_BUFSZ:
            bufsz = DEFAULT_BUFSZ;   
            publicFIFO = argv[3];
            break;
 
-        case DEF_BUFSZ: // If -l flag present in command line arguments
+        case DEF_BUFSZ:
             bufsz = (atoi(argv[4]) > 0) ? atoi(argv[4]) : DEFAULT_BUFSZ;
             publicFIFO = argv[5];
             break;
@@ -184,6 +187,9 @@ int main(int argc, char* argv[]) {
             perror("Error at number of arguments");
             return 1;
     }
+
+    pthread_mutex_init(&bufferMutex, NULL);
+    pthread_mutex_init(&runningMutex, NULL);
 
     sem_init(&semBufferEmpty, 0, bufsz);
     sem_init(&semBufferFull, 0, 0);
@@ -200,18 +206,16 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    if (requestReceiver(nsecs, publicFD) == 1) { // Invokes requestReceiver and handles errors 
+    if (requestReceiver(nsecs, publicFD, publicFIFO) == 1){
         perror("Error in requestReceiver\n");
     }
     
-    remove(publicFIFO);
     
     sem_destroy(&semBufferEmpty);
     sem_destroy(&semBufferFull);
     
     pthread_mutex_destroy(&bufferMutex);
-    pthread_mutex_destroy(&unreadMessagesMutex);
-
+    pthread_mutex_destroy(&runningMutex);
 
     return 0;
 }
